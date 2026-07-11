@@ -5,111 +5,113 @@
 
 /*
  * =============================================================================
- *  IndexWeaver
- *  A high-performance index registry plugin for open.mp.
+ * IndexWeaver
+ * A high-performance index registry plugin for open.mp.
  *
- *  Powered by robin_hood flat hashing, providing ultra-fast average constant-
- *  time lookups, cache-friendly memory access, and minimal allocation overhead.
+ * Powered by robin_hood flat hashing, providing ultra-fast average constant-
+ * time lookups, cache-friendly memory access, and minimal allocation overhead.
  *
- *  Designed for large-scale registries where identifier-to-index lookups must
- *  remain efficient even with hundreds of thousands of entries.
+ * Designed for large-scale registries where identifier-to-index lookups must
+ * remain efficient even with hundreds of thousands of entries.
  * =============================================================================
  */
 
 /*
- * Common return codes.
+ * Standard return code for failed or missing lookups.
  */
 #define INVALID_MAP_INDEX -1
-#define INDEX_WEAVER_SUCCESS 1
 
 /*
- * Creates or updates a mapping between a unique identifier and an index.
+ * Creates or updates a mapping between a unique identifier and an array index.
  *
  * Parameters:
- *   registry_type - Registry identifier.
- *   id            - Unique identifier.
- *   index         - Index associated with the identifier.
+ * registry_type - Registry category identifier (must be >= 0).
+ * id            - Unique database or system identifier.
+ * index         - Array index associated with the identifier (must be >= 0).
  *
  * Returns:
- *   INDEX_WEAVER_SUCCESS.
+ * true if the mapping was created or updated successfully.
+ * false if parameters are invalid (e.g., negative registry_type or index).
  */
-native SetMapIndex(registry_type, id, index);
+native bool:SetMapIndex(registry_type, id, index);
 
 /*
- * Retrieves the index associated with a unique identifier.
+ * Retrieves the array index associated with a unique identifier.
  *
  * Parameters:
- *   registry_type - Registry identifier.
- *   id            - Unique identifier.
+ * registry_type - Registry category identifier.
+ * id            - Unique database or system identifier.
  *
  * Returns:
- *   The associated index if the mapping exists.
- *   INVALID_MAP_INDEX otherwise.
+ * The associated array index if the mapping exists.
+ * INVALID_MAP_INDEX (-1) otherwise.
  */
 native GetMapIndex(registry_type, id);
 
 /*
- * Removes a mapping from a registry.
+ * Removes a specific mapping from a registry.
  *
  * Parameters:
- *   registry_type - Registry identifier.
- *   id            - Unique identifier.
+ * registry_type - Registry category identifier.
+ * id            - Unique database or system identifier.
  *
  * Returns:
- *   true if the mapping existed and was removed.
- *   false otherwise.
+ * true if the mapping existed and was removed.
+ * false if the mapping did not exist or parameters were invalid.
  */
 native bool:RemoveMapIndex(registry_type, id);
 
 /*
- * Checks whether a mapping exists.
+ * Checks whether a mapping exists for the given identifier.
  *
  * Parameters:
- *   registry_type - Registry identifier.
- *   id            - Unique identifier.
+ * registry_type - Registry category identifier.
+ * id            - Unique database or system identifier.
  *
  * Returns:
- *   true if the mapping exists.
- *   false otherwise.
+ * true if the mapping exists.
+ * false otherwise.
  */
 native bool:HasMapIndex(registry_type, id);
 
 /*
- * Removes every mapping stored in the specified registry.
+ * Removes every mapping stored in the specified registry and frees its memory.
  *
  * Parameters:
- *   registry_type - Registry identifier.
+ * registry_type - Registry category identifier.
  *
  * Returns:
- *   INDEX_WEAVER_SUCCESS.
+ * true if the registry existed and was cleared.
+ * false if the registry_type was invalid or not found.
  */
-native ClearMapRegistry(registry_type);
+native bool:ClearMapRegistry(registry_type);
 
 /*
- * Removes every mapping from every registry managed by the plugin.
+ * Removes every mapping from every registry managed by the plugin, completely
+ * resetting the internal storage to its initial state.
  *
  * Returns:
- *   INDEX_WEAVER_SUCCESS.
+ * No return value (void).
  */
 native ClearAllMapRegistries();
 
 /*
- * Reserves memory for a registry before inserting large numbers of mappings.
+ * Pre-allocates memory for a registry before inserting large numbers of mappings.
  *
  * Calling this function before bulk insert operations (for example, loading
- * thousands of records from MySQL or TiDB during server startup) minimizes
- * internal rehashing and memory reallocations, significantly reducing CPU
- * overhead during insertion.
+ * thousands of records from MySQL or TiDB during server startup) eliminates
+ * internal rehashing and memory reallocations, ensuring zero CPU stutters.
  *
- * This function does not create mappings. It only preallocates storage for the
- * specified registry, allowing subsequent SetMapIndex() calls to execute with
- * fewer allocation events.
+ * This function does not create mappings. It only reserves physical memory for
+ * the specified registry, allowing subsequent SetMapIndex() calls to execute at
+ * maximum speed.
  *
  * Parameters:
- *   registry_type - Registry identifier.
- *   capacity      - Expected number of mappings to be stored.
+ * registry_type - Registry category identifier (must be >= 0).
+ * capacity      - Expected number of mappings to be stored (must be > 0).
  *
  * Returns:
- *   INDEX_WEAVER_SUCCESS.
+ * true if memory was preallocated successfully.
+ * false if capacity is out of bounds or registry_type is invalid.
  */
-native ReserveMapRegistry(registry_type, capacity);
+native bool:ReserveMapRegistry(registry_type, capacity);
