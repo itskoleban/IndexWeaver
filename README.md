@@ -106,11 +106,10 @@ Include the library in Pawn:
 | `ClearAllMapRegistries()`                     | Removes every mapping from every registry type. | No return value                                |
 | `ReserveMapRegistry(registry_type, capacity)` | Pre-allocates space for a registry.             | `true` on success, `false` on failure          |
 
-### Common constants
+### Common constant
 
 ```pawn
 #define INVALID_MAP_INDEX -1
-#define INDEX_WEAVER_SUCCESS 1
 ```
 
 `INVALID_MAP_INDEX` is the sentinel returned when a lookup fails.
