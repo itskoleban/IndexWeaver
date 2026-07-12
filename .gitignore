@@ -1,3 +1,45 @@
+# ==========================
+# Editor / Formatting
+# ==========================
 .prettierignore
+.clang-format
+
+# ==========================
+# Documentation / Notes
+# ==========================
 README.dev.md
+
+# ==========================
+# Build directories
+# ==========================
 build/
+cmake-build-*/
+out/
+
+# ==========================
+# Logs / Temporary files
+# ==========================
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# ==========================
+# C/C++ Build artifacts
+# ==========================
+*.obj
+*.o
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# ==========================
+# Compiled binaries
+# ==========================
+*.exe
+*.dll
+*.so
+*.dylib

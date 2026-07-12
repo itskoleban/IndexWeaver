@@ -10,89 +10,110 @@ index_weaver::IndexRegistryStore* gIndexWeaverStore = nullptr;
 
 class IndexWeaverComponent final : public IComponent, public PawnEventHandler
 {
-private:
-    IPawnComponent* pawn_ = nullptr;
-    index_weaver::IndexRegistryStore registry_;
-    bool initialized_ = false;
+  private:
+	IPawnComponent* pawn_ = nullptr;
+	index_weaver::IndexRegistryStore registry_;
+	bool initialized_ = false;
 
-public:
-    PROVIDE_UID(0x66A7B41CA0D8F3CF);
+  public:
+	PROVIDE_UID(0x66A7B41CA0D8F3CF);
 
-    ~IndexWeaverComponent() override
-    {
-        cleanup();
-    }
+	~IndexWeaverComponent() override
+	{
+		cleanup();
+	}
 
-    StringView componentName() const override { return "IndexWeaver"; }
-    SemanticVersion componentVersion() const override { return {1, 0, 0, 0}; }
+	StringView componentName() const override
+	{
+		return "IndexWeaver";
+	}
 
-    void onLoad(ICore* core) override
-    {
-        gIndexWeaverStore = &registry_;
-        initialized_ = true;
-    }
+	SemanticVersion componentVersion() const override
+	{
+		return {1, 0, 0, 0};
+	}
 
-    void onInit(IComponentList* components) override
-    {
-        pawn_ = components->queryComponent<IPawnComponent>();
-        if (!pawn_) return;
+	void onLoad(ICore* /*core*/) override
+	{
+		gIndexWeaverStore = &registry_;
+		initialized_ = true;
+	}
 
-        setAmxFunctions(pawn_->getAmxFunctions());
-        pawn_->getEventDispatcher().addEventHandler(this);
-    }
+	void onInit(IComponentList* components) override
+	{
+		pawn_ = components->queryComponent<IPawnComponent>();
 
-    void onReady() override {}
+		if (!pawn_)
+		{
+			return;
+		}
 
-    void onFree(IComponent* component) override
-    {
-        if (component == pawn_)
-        {
-            pawn_->getEventDispatcher().removeEventHandler(this);
-            pawn_ = nullptr;
-            setAmxFunctions();
-        }
-    }
+		setAmxFunctions(pawn_->getAmxFunctions());
+		pawn_->getEventDispatcher().addEventHandler(this);
+	}
 
-    void reset() override
-    {
-        if (initialized_) registry_.clearAll();
-    }
+	void onReady() override {}
 
-    void free() override
-    {
-        cleanup();
-        delete this;
-    }
+	void onFree(IComponent* component) override
+	{
+		if (component == pawn_ && pawn_)
+		{
+			pawn_->getEventDispatcher().removeEventHandler(this);
+			pawn_ = nullptr;
 
-    void onAmxLoad(IPawnScript& script) override
-    {
-        if (initialized_) pawn_natives::AmxLoad(script.GetAMX());
-    }
+			setAmxFunctions();
+		}
+	}
 
-    void onAmxUnload(IPawnScript&) override {}
+	void reset() override
+	{
+		if (initialized_)
+		{
+			registry_.clearAll();
+		}
+	}
 
-private:
-    void cleanup() noexcept
-    {
-        if (!initialized_) return;
+	void free() override
+	{
+		cleanup();
+		delete this;
+	}
 
-        if (pawn_)
-        {
-            pawn_->getEventDispatcher().removeEventHandler(this);
-            pawn_ = nullptr;
-        }
+	void onAmxLoad(IPawnScript& script) override
+	{
+		if (initialized_)
+		{
+			pawn_natives::AmxLoad(script.GetAMX());
+		}
+	}
 
-        if (gIndexWeaverStore == &registry_)
-        {
-            gIndexWeaverStore = nullptr;
-        }
-        
-        registry_.clearAll();
-        initialized_ = false;
-    }
+	void onAmxUnload(IPawnScript&) override {}
+
+  private:
+	void cleanup() noexcept
+	{
+		if (!initialized_)
+		{
+			return;
+		}
+
+		if (pawn_)
+		{
+			pawn_->getEventDispatcher().removeEventHandler(this);
+			pawn_ = nullptr;
+		}
+
+		if (gIndexWeaverStore == &registry_)
+		{
+			gIndexWeaverStore = nullptr;
+		}
+
+		registry_.clearAll();
+		initialized_ = false;
+	}
 };
 
 COMPONENT_ENTRY_POINT()
 {
-    return new IndexWeaverComponent();
+	return new IndexWeaverComponent();
 }

@@ -6,6 +6,10 @@ project(IndexWeaver
     DESCRIPTION "Lightweight in-memory index registry plugin for open.mp"
 )
 
+include(GNUInstallDirs)
+include(CTest)
+include(CheckIPOSupported)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -19,23 +23,7 @@ add_library(IndexWeaver SHARED
     src/natives.cpp
 )
 
-include(CheckIPOSupported)
-check_ipo_supported(RESULT result OUTPUT output)
-if(result)
-    set_target_properties(IndexWeaver PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
-
-if(MINGW)
-    target_link_options(IndexWeaver PRIVATE
-        "-static-libgcc"
-        "-static-libstdc++"
-        "-Wl,-Bstatic" "-lwinpthread" "-Wl,-Bdynamic"
-    )
-elseif(MSVC)
-    set_property(TARGET IndexWeaver PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-    )
-endif()
+target_compile_features(IndexWeaver PRIVATE cxx_std_20)
 
 target_include_directories(IndexWeaver PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -66,6 +54,7 @@ endif()
 
 if(MSVC)
     target_compile_options(IndexWeaver PRIVATE /W4 /permissive-)
+    set_property(TARGET IndexWeaver PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 else()
     target_compile_options(IndexWeaver PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -75,18 +64,39 @@ set_target_properties(IndexWeaver PROPERTIES
     PREFIX ""
 )
 
-option(BUILD_TESTS "Build IndexWeaver tests" ON)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output)
+if(ipo_supported)
+    set_target_properties(IndexWeaver PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
 
-if(BUILD_TESTS)
+if(MINGW)
+    target_link_options(IndexWeaver PRIVATE
+        "-static-libgcc"
+        "-static-libstdc++"
+        "-Wl,-Bstatic" "-lwinpthread" "-Wl,-Bdynamic"
+    )
+endif()
+
+option(INDEX_WEAVER_BUILD_TESTS "Build IndexWeaver tests" OFF)
+
+if(BUILD_TESTING AND INDEX_WEAVER_BUILD_TESTS)
     add_executable(IndexWeaverTests tests/test_store.cpp src/mapper_store.cpp)
-
-    target_include_directories(IndexWeaverTests PRIVATE 
+    target_compile_features(IndexWeaverTests PRIVATE cxx_std_20)
+    target_include_directories(IndexWeaverTests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include
     )
-
-    set_target_properties(IndexWeaverTests PROPERTIES 
-        CXX_STANDARD 20 
-        CXX_STANDARD_REQUIRED ON
-    )
+    if(MSVC)
+        set_property(TARGET IndexWeaverTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+    add_test(NAME IndexWeaverTests COMMAND IndexWeaverTests)
 endif()
+
+install(TARGETS IndexWeaver
+    RUNTIME DESTINATION components
+    LIBRARY DESTINATION components
+    ARCHIVE DESTINATION components
+)
+
+install(FILES include/indexweaver.inc DESTINATION include)
+install(FILES README.md LICENSE DESTINATION .)
