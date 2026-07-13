@@ -116,7 +116,8 @@ IndexWeaver uses a modern, target-centric CMake structure (`>= 3.19`).
 
 ```powershell
 # 1. Generate build files (Release mode recommended)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+# NOTE: Windows open.mp servers usually run in 32-bit mode. Use -A Win32 on Windows.
+cmake -S . -B build -A Win32 -DCMAKE_BUILD_TYPE=Release
 
 # 2. Compile the plugin
 cmake --build build --config Release

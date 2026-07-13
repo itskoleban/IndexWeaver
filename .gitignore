@@ -13,6 +13,7 @@ README.dev.md
 # Build directories
 # ==========================
 build/
+build32/
 cmake-build-*/
 out/
 
