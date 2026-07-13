@@ -30,11 +30,15 @@ namespace index_weaver
 		/** @brief Maximum number of elements that can be reserved at once. */
 		static constexpr std::size_t MAX_RESERVED_CAPACITY = 10000000;
 
+		/**
+		 * @enum DebugLevel
+		 * @brief Defines the verbosity of the internal logger.
+		 */
 		enum class DebugLevel : std::uint8_t
 		{
-			Off = 0,
-			Errors = 1,
-			Verbose = 2
+			Off = 0,	///< Silence all logs
+			Errors = 1, ///< Log only critical failures and exceptions
+			Verbose = 2 ///< Log every single insertion, removal, and lookup trace
 		};
 
 		/**
@@ -103,23 +107,38 @@ namespace index_weaver
 		 */
 		[[nodiscard]] std::size_t totalRegistries() const noexcept;
 
+		/**
+		 * @brief Dynamically adjusts the logger verbosity at runtime.
+		 * @param level The desired debug level.
+		 */
 		void setDebugLevel(DebugLevel level) noexcept
 		{
 			debug_level_ = level;
 		}
+
+		/**
+		 * @brief Retrieves the current logger verbosity.
+		 * @return The active DebugLevel.
+		 */
 		[[nodiscard]] DebugLevel debugLevel() const noexcept
 		{
 			return debug_level_;
 		}
 
 	  private:
+		/**
+		 * @brief Internal printf-style formatted logger.
+		 * @param fmt The format string.
+		 */
 		static void debugLog(const char* fmt, ...) noexcept;
 
+		/** @brief Fast check to see if we should incur logging overhead for errors. */
 		[[nodiscard]] bool shouldLogErrors() const noexcept
 		{
 			return debug_level_ != DebugLevel::Off;
 		}
 
+		/** @brief Fast check to see if we should incur logging overhead for traces. */
 		[[nodiscard]] bool shouldLogVerbose() const noexcept
 		{
 			return debug_level_ == DebugLevel::Verbose;
@@ -138,7 +157,18 @@ namespace index_weaver
 		/** @brief Current debug verbosity level. */
 		DebugLevel debug_level_ = DebugLevel::Off;
 
+		/**
+		 * @brief Helper to resolve the correct hash map for writing operations.
+		 * @param registryType The category ID.
+		 * @return A mutable reference to the target robin_hood map.
+		 */
 		robin_hood::unordered_flat_map<int, int>& getRegistryForWrite(int registryType);
+
+		/**
+		 * @brief Helper to resolve the correct hash map for read-only operations.
+		 * @param registryType The category ID.
+		 * @return A const pointer to the target map, or nullptr if the slow map doesn't exist.
+		 */
 		const robin_hood::unordered_flat_map<int, int>*
 		getRegistryForRead(int registryType) const noexcept;
 	};

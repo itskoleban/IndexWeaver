@@ -61,6 +61,12 @@ To use IndexWeaver, include the header in your game mode:
 - `bool:ReserveMapRegistry(registry_type, capacity)`
   Pre-allocates memory for a registry to prevent rehashing during bulk insertions (e.g., loading thousands of vehicles at server boot). Rejects capacities over `10,000,000`.
 
+- `bool:SetMapDebugLevel(level)` / `GetMapDebugLevel()`
+  Dynamically changes the verbosity of the plugin's internal logger to the server console. 
+  - `0`: Off (Default)
+  - `1`: Errors & Exceptions
+  - `2`: Verbose (Traces every insertion, deletion, and lookup)
+
 ---
 
 ## 📖 Usage Example
