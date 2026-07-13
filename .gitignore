@@ -44,3 +44,20 @@ out/
 *.dll
 *.so
 *.dylib
+
+# ==========================
+# IDEs and Editors
+# ==========================
+.vscode/
+.vs/
+.idea/
+*.suo
+*.user
+*.sln
+compile_commands.json
+
+# ==========================
+# OS Generated Files
+# ==========================
+.DS_Store
+Thumbs.db

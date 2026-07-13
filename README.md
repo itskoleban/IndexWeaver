@@ -138,6 +138,10 @@ cmake --build build --config Release
 
 ## ⚙️ Installation
 
-1. Copy the compiled `IndexWeaver.dll` (Windows) or `IndexWeaver.so` (Linux) to your server's `components/` directory.
-2. Place `include/indexweaver.inc` into your pawn compiler's `include/` directory.
-3. Open your server configuration and ensure the component is loaded.
+The easiest way to install IndexWeaver is to download the pre-compiled binaries from the **[Releases](../../releases/latest)** tab.
+
+1. Download `IndexWeaver.dll` (Windows) or `IndexWeaver.so` (Linux).
+2. Move the downloaded binary to your server's `components/` directory.
+3. Download `indexweaver.inc` from the `include/` folder of this repository.
+4. Place `indexweaver.inc` into your pawn compiler's `include/` directory.
+5. Open your `config.json` (open.mp server config) and ensure the component is loaded.

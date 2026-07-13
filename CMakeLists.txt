@@ -53,6 +53,10 @@ set_target_properties(IndexWeaver PROPERTIES
 # ==============================================================================
 target_include_directories(IndexWeaver PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
+# Mark third-party libraries as SYSTEM to suppress their compiler warnings
+target_include_directories(IndexWeaver SYSTEM PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/glm>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include>
@@ -61,6 +65,12 @@ target_include_directories(IndexWeaver PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/compiler/source>
 )
+
+if(NOT WIN32)
+    target_include_directories(IndexWeaver SYSTEM PRIVATE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/compiler/source/linux>
+    )
+endif()
 
 target_compile_definitions(IndexWeaver PRIVATE
     HAVE_STDINT_H=1
@@ -126,16 +136,18 @@ if(BUILD_TESTING AND INDEX_WEAVER_BUILD_TESTS)
         tests/test_store.cpp 
         src/mapper_store.cpp
     )
-    
+
     target_include_directories(IndexWeaverTests PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    )
+    target_include_directories(IndexWeaverTests SYSTEM PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include>
     )
 
     if(MSVC)
         set_property(TARGET IndexWeaverTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     endif()
-    
+
     add_test(NAME UnitTests COMMAND IndexWeaverTests)
 
     # 2. Stress Test / Benchmark
@@ -143,9 +155,11 @@ if(BUILD_TESTING AND INDEX_WEAVER_BUILD_TESTS)
         tests/test_stress.cpp 
         src/mapper_store.cpp
     )
-    
+
     target_include_directories(IndexWeaverStress PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    )
+    target_include_directories(IndexWeaverStress SYSTEM PRIVATE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include>
     )
 
