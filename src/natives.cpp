@@ -1,3 +1,11 @@
+/**
+ * @file natives.cpp
+ * @brief Implementation of the open.mp Pawn API natives.
+ *
+ * This file maps the C++ AMX natives exported to Pawn into the internal
+ * methods of the global IndexRegistryStore.
+ */
+
 #include "natives.hpp"
 #include "mapper_store.hpp"
 

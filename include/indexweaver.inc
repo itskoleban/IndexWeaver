@@ -36,9 +36,9 @@
 /*
  * Debug logging levels.
  */
-#define INDEX_WEAVER_DEBUG_OFF      0
-#define INDEX_WEAVER_DEBUG_ERRORS   1
-#define INDEX_WEAVER_DEBUG_VERBOSE  2
+#define INDEX_WEAVER_DEBUG_OFF 0
+#define INDEX_WEAVER_DEBUG_ERRORS 1
+#define INDEX_WEAVER_DEBUG_VERBOSE 2
 
 /*
  * Sets the plugin debug logging level.

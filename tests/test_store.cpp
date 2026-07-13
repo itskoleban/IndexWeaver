@@ -37,7 +37,7 @@ static void run_unit_tests()
 
 	std::cout << "[TEST] 3. Reserve...\n";
 	assert(store.reserve(5, 50000));
-	assert(store.totalRegistries() == 1);
+	assert(store.totalRegistries() == 0);
 	assert(store.count(5) == 0);
 	assert(!store.reserve(-1, 50000));
 	assert(!store.reserve(5, 0));
@@ -60,9 +60,9 @@ static void run_unit_tests()
 	assert(store.set(77, 1, 1));
 	assert(store.set(77, 2, 2));
 	assert(store.remove(77, 1));
-	assert(store.totalRegistries() == 3); // registries 1, 5, 77
+	assert(store.totalRegistries() == 2); // registries 1, 77
 	assert(store.remove(77, 2));
-	assert(store.totalRegistries() == 2); // registries 1, 5
+	assert(store.totalRegistries() == 1); // registries 1
 	assert(store.count(77) == 0);
 
 	std::cout << "\n[PASS] All unit tests passed successfully.\n\n";

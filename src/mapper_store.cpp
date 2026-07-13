@@ -1,3 +1,11 @@
+/**
+ * @file mapper_store.cpp
+ * @brief Implementation of the IndexWeaver hybrid storage system.
+ *
+ * This file contains the implementation of the IndexRegistryStore class, handling
+ * the logic for fast array-based registries and dynamic map-based registries,
+ * as well as memory retention optimizations.
+ */
 #include "mapper_store.hpp"
 
 #include <cstdarg>
@@ -14,6 +22,34 @@ namespace index_weaver
 		va_end(args);
 	}
 
+	robin_hood::unordered_flat_map<int, int>&
+	IndexRegistryStore::getRegistryForWrite(int registryType)
+	{
+		if (registryType >= 0 && registryType < FAST_REGISTRY_LIMIT)
+		{
+			return fast_registries_[registryType];
+		}
+
+		return slow_registries_[registryType];
+	}
+
+	const robin_hood::unordered_flat_map<int, int>*
+	IndexRegistryStore::getRegistryForRead(int registryType) const noexcept
+	{
+		if (registryType >= 0 && registryType < FAST_REGISTRY_LIMIT)
+		{
+			return &fast_registries_[registryType];
+		}
+
+		auto it = slow_registries_.find(registryType);
+		if (it != slow_registries_.end())
+		{
+			return &it->second;
+		}
+
+		return nullptr;
+	}
+
 	bool IndexRegistryStore::set(int registryType, int id, int index)
 	{
 		if (registryType < 0 || index < 0)
@@ -23,68 +59,35 @@ namespace index_weaver
 				debugLog("[IndexWeaver] SetMapIndex failed: registryType=%d id=%d index=%d",
 						 registryType, id, index);
 			}
+
 			return false;
 		}
 
-		const uint64_t key = make_key(registryType, id);
-
 		try
 		{
-			auto [regIt, regInserted] = registry_.try_emplace(key, index);
+			auto& registry = getRegistryForWrite(registryType);
+			auto [idIt, idInserted] = registry.try_emplace(id, index);
 
-			if (!regInserted)
+			if (!idInserted)
 			{
-				regIt->second = index;
+				idIt->second = index;
 
 				if (shouldLogVerbose())
 				{
 					debugLog("[IndexWeaver] SetMapIndex updated: type=%d id=%d index=%d",
 							 registryType, id, index);
 				}
-				return true;
 			}
-
-			try
+			else
 			{
-				auto [typeIt, typeInserted] = keys_by_type_.try_emplace(registryType);
-				(void)typeInserted;
-
-				auto [keyIt, keyInserted] = typeIt->second.insert(key);
-				(void)keyIt;
-
-				if (!keyInserted)
-				{
-					registry_.erase(regIt);
-					if (typeIt->second.empty())
-					{
-						keys_by_type_.erase(typeIt);
-					}
-
-					if (shouldLogErrors())
-					{
-						debugLog("[IndexWeaver] SetMapIndex rollback failed: type=%d id=%d",
-								 registryType, id);
-					}
-					return false;
-				}
-
 				if (shouldLogVerbose())
 				{
 					debugLog("[IndexWeaver] SetMapIndex inserted: type=%d id=%d index=%d",
 							 registryType, id, index);
 				}
-				return true;
 			}
-			catch (...)
-			{
-				registry_.erase(regIt);
-				if (shouldLogErrors())
-				{
-					debugLog("[IndexWeaver] SetMapIndex exception: type=%d id=%d", registryType,
-							 id);
-				}
-				return false;
-			}
+
+			return true;
 		}
 		catch (...)
 		{
@@ -92,29 +95,34 @@ namespace index_weaver
 			{
 				debugLog("[IndexWeaver] SetMapIndex exception: type=%d id=%d", registryType, id);
 			}
+
 			return false;
 		}
 	}
 
 	int IndexRegistryStore::get(int registryType, int id) const noexcept
 	{
-		if (registryType < 0)
+		const auto* registry = getRegistryForRead(registryType);
+
+		if (!registry)
 		{
 			return INVALID_INDEX;
 		}
 
-		const auto it = registry_.find(make_key(registryType, id));
-		return (it != registry_.end()) ? it->second : INVALID_INDEX;
+		const auto idIt = registry->find(id);
+		return (idIt != registry->end()) ? idIt->second : INVALID_INDEX;
 	}
 
 	bool IndexRegistryStore::has(int registryType, int id) const noexcept
 	{
-		if (registryType < 0)
+		const auto* registry = getRegistryForRead(registryType);
+
+		if (!registry)
 		{
 			return false;
 		}
 
-		return registry_.contains(make_key(registryType, id));
+		return registry->contains(id);
 	}
 
 	bool IndexRegistryStore::remove(int registryType, int id) noexcept
@@ -126,30 +134,49 @@ namespace index_weaver
 				debugLog("[IndexWeaver] RemoveMapIndex failed: invalid type=%d id=%d", registryType,
 						 id);
 			}
+
 			return false;
 		}
 
-		const uint64_t key = make_key(registryType, id);
-
-		auto regIt = registry_.find(key);
-		if (regIt == registry_.end())
+		if (registryType >= 0 && registryType < FAST_REGISTRY_LIMIT)
 		{
-			if (shouldLogVerbose())
+			auto& registry = fast_registries_[registryType];
+			if (registry.erase(id) == 0)
 			{
-				debugLog("[IndexWeaver] RemoveMapIndex miss: type=%d id=%d", registryType, id);
+				if (shouldLogVerbose())
+				{
+					debugLog("[IndexWeaver] RemoveMapIndex miss: type=%d id=%d", registryType, id);
+				}
+
+				return false;
 			}
-			return false;
 		}
-
-		registry_.erase(regIt);
-
-		auto typeIt = keys_by_type_.find(registryType);
-		if (typeIt != keys_by_type_.end())
+		else
 		{
-			typeIt->second.erase(key);
-			if (typeIt->second.empty())
+			auto it = slow_registries_.find(registryType);
+			if (it == slow_registries_.end())
 			{
-				keys_by_type_.erase(typeIt);
+				if (shouldLogVerbose())
+				{
+					debugLog("[IndexWeaver] RemoveMapIndex miss: type=%d id=%d", registryType, id);
+				}
+
+				return false;
+			}
+
+			if (it->second.erase(id) == 0)
+			{
+				if (shouldLogVerbose())
+				{
+					debugLog("[IndexWeaver] RemoveMapIndex miss: type=%d id=%d", registryType, id);
+				}
+
+				return false;
+			}
+
+			if (it->second.empty())
+			{
+				slow_registries_.erase(it);
 			}
 		}
 
@@ -157,6 +184,7 @@ namespace index_weaver
 		{
 			debugLog("[IndexWeaver] RemoveMapIndex ok: type=%d id=%d", registryType, id);
 		}
+
 		return true;
 	}
 
@@ -168,39 +196,62 @@ namespace index_weaver
 			{
 				debugLog("[IndexWeaver] ClearMapRegistry failed: invalid type=%d", registryType);
 			}
+
 			return false;
 		}
 
-		auto typeIt = keys_by_type_.find(registryType);
-		if (typeIt == keys_by_type_.end())
+		std::size_t removed = 0;
+
+		if (registryType >= 0 && registryType < FAST_REGISTRY_LIMIT)
 		{
-			if (shouldLogVerbose())
+			auto& registry = fast_registries_[registryType];
+			removed = registry.size();
+			if (removed == 0)
 			{
-				debugLog("[IndexWeaver] ClearMapRegistry miss: type=%d", registryType);
+				if (shouldLogVerbose())
+				{
+					debugLog("[IndexWeaver] ClearMapRegistry miss: type=%d", registryType);
+				}
+
+				return false;
 			}
-			return false;
-		}
 
-		for (uint64_t key : typeIt->second)
+			registry.clear();
+		}
+		else
 		{
-			registry_.erase(key);
-		}
+			auto it = slow_registries_.find(registryType);
+			if (it == slow_registries_.end())
+			{
+				if (shouldLogVerbose())
+				{
+					debugLog("[IndexWeaver] ClearMapRegistry miss: type=%d", registryType);
+				}
 
-		const std::size_t removed = typeIt->second.size();
-		keys_by_type_.erase(typeIt);
+				return false;
+			}
+
+			removed = it->second.size();
+			slow_registries_.erase(it);
+		}
 
 		if (shouldLogVerbose())
 		{
 			debugLog("[IndexWeaver] ClearMapRegistry ok: type=%d removed=%zu", registryType,
 					 removed);
 		}
+
 		return true;
 	}
 
 	void IndexRegistryStore::clearAll() noexcept
 	{
-		registry_.clear();
-		keys_by_type_.clear();
+		for (auto& reg : fast_registries_)
+		{
+			reg.clear();
+		}
+
+		slow_registries_.clear();
 
 		if (shouldLogVerbose())
 		{
@@ -217,24 +268,20 @@ namespace index_weaver
 				debugLog("[IndexWeaver] ReserveMapRegistry failed: type=%d capacity=%zu",
 						 registryType, capacity);
 			}
+
 			return false;
 		}
 
 		try
 		{
-			registry_.reserve(registry_.size() + capacity);
-
-			auto typeIt = keys_by_type_.find(registryType);
-			if (typeIt != keys_by_type_.end())
-			{
-				typeIt->second.reserve(typeIt->second.size() + capacity);
-			}
+			getRegistryForWrite(registryType).reserve(capacity);
 
 			if (shouldLogVerbose())
 			{
 				debugLog("[IndexWeaver] ReserveMapRegistry ok: type=%d capacity=%zu", registryType,
 						 capacity);
 			}
+
 			return true;
 		}
 		catch (...)
@@ -244,18 +291,36 @@ namespace index_weaver
 				debugLog("[IndexWeaver] ReserveMapRegistry exception: type=%d capacity=%zu",
 						 registryType, capacity);
 			}
+
 			return false;
 		}
 	}
 
 	std::size_t IndexRegistryStore::count(int registryType) const noexcept
 	{
-		const auto it = keys_by_type_.find(registryType);
-		return (it != keys_by_type_.end()) ? it->second.size() : 0;
+		const auto* registry = getRegistryForRead(registryType);
+		return registry ? registry->size() : 0;
 	}
 
 	std::size_t IndexRegistryStore::totalRegistries() const noexcept
 	{
-		return keys_by_type_.size();
+		std::size_t count = 0;
+
+		for (const auto& pair : slow_registries_)
+		{
+			if (!pair.second.empty())
+			{
+				count++;
+			}
+		}
+		for (const auto& reg : fast_registries_)
+		{
+			if (!reg.empty())
+			{
+				count++;
+			}
+		}
+
+		return count;
 	}
 } // namespace index_weaver

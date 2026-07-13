@@ -1,3 +1,11 @@
+/**
+ * @file main.cpp
+ * @brief Entry point and component lifecycle management for the IndexWeaver open.mp plugin.
+ *
+ * This file defines the main component class that integrates with the open.mp
+ * server lifecycle and registers the Pawn event handlers and natives.
+ */
+
 #include <sdk.hpp>
 #include <pawn-natives/NativeFunc.hpp>
 #include <Server/Components/Pawn/pawn.hpp>
@@ -8,6 +16,14 @@
 
 index_weaver::IndexRegistryStore* gIndexWeaverStore = nullptr;
 
+/**
+ * @class IndexWeaverComponent
+ * @brief Manages the open.mp component integration and Pawn AMX lifecycle.
+ *
+ * It is responsible for attaching natives to Pawn scripts when they load,
+ * managing the globally accessible IndexRegistryStore, and cleaning up
+ * allocations when the server resets or unloads the plugin.
+ */
 class IndexWeaverComponent final : public IComponent, public PawnEventHandler
 {
   private:
