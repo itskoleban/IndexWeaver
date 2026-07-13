@@ -57,6 +57,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
@@ -75,4 +78,5 @@ jobs:
           files: |
             out/IndexWeaver.dll
             out/IndexWeaver.so
+            include/indexweaver.inc
           generate_release_notes: true
