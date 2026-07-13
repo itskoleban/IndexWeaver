@@ -27,6 +27,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Install 32-bit Toolchain (Linux)
       if: runner.os == 'Linux'
