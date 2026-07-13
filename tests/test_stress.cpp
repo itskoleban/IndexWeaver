@@ -26,11 +26,11 @@ int main()
 			auto start = std::chrono::high_resolution_clock::now();
 			
 			// Pre-allocate memory to prevent rehashing from skewing the insert timings
-			store.reserve(registryType, ITERATIONS);
+			(void)store.reserve(registryType, ITERATIONS);
 			
 			for (int i = 0; i < ITERATIONS; ++i)
 			{
-				store.set(registryType, i, i * 2);
+				(void)store.set(registryType, i, i * 2);
 			}
 			
 			auto end = std::chrono::high_resolution_clock::now();
@@ -60,7 +60,7 @@ int main()
 			auto start = std::chrono::high_resolution_clock::now();
 			for (int i = 0; i < ITERATIONS; ++i)
 			{
-				store.remove(registryType, i);
+				(void)store.remove(registryType, i);
 			}
 			auto end = std::chrono::high_resolution_clock::now();
 			std::chrono::duration<double> diff = end - start;

@@ -171,8 +171,18 @@ class IndexWeaverComponent final : public IComponent, public PawnEventHandler
 	}
 };
 
+// Suppress GCC/Clang warnings about 'cdecl' attribute being ignored on non-Windows platforms
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
+
 // Expose the creation function for the open.mp component loader to find and initialize
 COMPONENT_ENTRY_POINT()
 {
 	return new IndexWeaverComponent();
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

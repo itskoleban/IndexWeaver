@@ -1,6 +1,6 @@
 # IndexWeaver
 
-**IndexWeaver** is a high-performance, lightweight in-memory ID-to-index registry plugin designed specifically for the **open.mp** environment. 
+**IndexWeaver** is a high-performance, lightweight in-memory ID-to-index registry plugin designed specifically for the **open.mp** environment.
 
 Its primary purpose is to eliminate linear loops (`for(...)`) when resolving arbitrary database IDs (like Player Account IDs, Clan IDs, or dynamic Vehicle IDs) into their respective Pawn array indices. Instead of storing complex data, IndexWeaver maps your primary keys to array slots, allowing your Pawn code to remain the single source of truth for the actual data.
 
@@ -14,7 +14,7 @@ IndexWeaver implements a heavily optimized **Hybrid Storage Model** designed to 
    - Implemented via a fixed `std::array` for direct `O(1)` contiguous memory access.
    - Bypasses external hash-resolution entirely.
    - **Zero-Allocation Retention:** Erasing elements here merely clears the buckets. The capacity is retained in memory, ensuring that frequent re-insertions (like players re-connecting) never trigger expensive OS heap allocations.
-   - *Benchmark:* ~30% faster insertions, lookups, and removals compared to traditional flat maps.
+   - _Benchmark:_ ~30% faster insertions, lookups, and removals compared to traditional flat maps.
 
 2. **Dynamic / Slow Registries (`Type >= 64`)**
    - Implemented as an outer map pointing to high-speed `robin_hood::unordered_flat_map` instances.
@@ -26,11 +26,13 @@ IndexWeaver implements a heavily optimized **Hybrid Storage Model** designed to 
 ## 📦 Pawn API Reference
 
 To use IndexWeaver, include the header in your game mode:
+
 ```pawn
 #include <indexweaver>
 ```
 
 ### Constants
+
 ```pawn
 #define INVALID_MAP_INDEX                   -1
 #define INDEX_WEAVER_VERSION                "1.0.0"
@@ -41,7 +43,7 @@ To use IndexWeaver, include the header in your game mode:
 
 - `bool:SetMapIndex(registry_type, id, index)`
   Links a unique `id` to an array `index` under a specific `registry_type`.
-  *(Note: Replaces the existing index if the `id` is already registered).*
+  _(Note: Replaces the existing index if the `id` is already registered)._
 
 - `GetMapIndex(registry_type, id)`
   Returns the array index associated with the `id`. Returns `INVALID_MAP_INDEX` if not found.
@@ -62,7 +64,7 @@ To use IndexWeaver, include the header in your game mode:
   Pre-allocates memory for a registry to prevent rehashing during bulk insertions (e.g., loading thousands of vehicles at server boot). Rejects capacities over `10,000,000`.
 
 - `bool:SetMapDebugLevel(level)` / `GetMapDebugLevel()`
-  Dynamically changes the verbosity of the plugin's internal logger to the server console. 
+  Dynamically changes the verbosity of the plugin's internal logger to the server console.
   - `0`: Off (Default)
   - `1`: Errors & Exceptions
   - `2`: Verbose (Traces every insertion, deletion, and lookup)
@@ -130,8 +132,11 @@ cmake --build build --config Release
 ```
 
 ### Running Tests and Benchmarks
+
 If you wish to run the internal storage unit tests or the stress benchmark, pass the test flag during configuration:
+
 ```powershell
+# Use -A Win32 if compiling on Windows to match the 32-bit architecture requirement
 cmake -S . -B build -DINDEX_WEAVER_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 
