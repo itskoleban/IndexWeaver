@@ -35,7 +35,7 @@ To use IndexWeaver, include the header in your game mode:
 
 ```pawn
 #define INVALID_MAP_INDEX                   -1
-#define INDEX_WEAVER_VERSION                "1.0.0"
+#define INDEX_WEAVER_VERSION                "1.1.0"
 #define INDEX_WEAVER_MAX_RESERVED_CAPACITY  10000000
 ```
 
