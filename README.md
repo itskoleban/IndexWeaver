@@ -60,6 +60,12 @@ To use IndexWeaver, include the header in your game mode:
 - `ClearAllMapRegistries()`
   Resets and completely wipes every single registry in the component.
 
+- `CountMapRegistry(registry_type)`
+  Returns the exact number of mappings currently stored inside a specific registry.
+
+- `CountAllMapRegistries()`
+  Returns the total number of active registries in the storage engine.
+
 - `bool:ReserveMapRegistry(registry_type, capacity)`
   Pre-allocates memory for a registry to prevent rehashing during bulk insertions (e.g., loading thousands of vehicles at server boot). Rejects capacities over `10,000,000`.
 

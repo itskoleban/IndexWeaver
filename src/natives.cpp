@@ -153,3 +153,36 @@ SCRIPT_API(GetMapDebugLevel, int())
 
 	return static_cast<int>(gIndexWeaverStore->debugLevel());
 }
+
+/**
+ * @brief Retrieves the total number of mappings stored in a specific registry.
+ *
+ * @param registryType The category ID to query.
+ * @return The number of elements currently mapped in the registry.
+ */
+SCRIPT_API(CountMapRegistry, int(int registryType))
+{
+	if (!gIndexWeaverStore)
+	{
+		return 0;
+	}
+
+	return static_cast<int>(gIndexWeaverStore->count(registryType));
+}
+
+/**
+ * @brief Retrieves the total number of active registries.
+ *
+ * An active registry is one that contains at least one mapping.
+ *
+ * @return The total number of active registries in the storage engine.
+ */
+SCRIPT_API(CountAllMapRegistries, int())
+{
+	if (!gIndexWeaverStore)
+	{
+		return 0;
+	}
+
+	return static_cast<int>(gIndexWeaverStore->totalRegistries());
+}

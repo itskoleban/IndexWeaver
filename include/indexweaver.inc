@@ -175,6 +175,33 @@ native bool:ClearMapRegistry(registry_type);
 native ClearAllMapRegistries();
 
 /*
+ * Retrieves the total number of mappings stored in a specific registry.
+ *
+ * Parameters:
+ * registry_type - Registry category identifier.
+ *
+ * Returns:
+ * The number of elements currently mapped in the registry.
+ *
+ * Complexity:
+ * O(1).
+ */
+native CountMapRegistry(registry_type);
+
+/*
+ * Retrieves the total number of active registries.
+ *
+ * An active registry is one that contains at least one mapping.
+ *
+ * Returns:
+ * The total number of active registries in the storage engine.
+ *
+ * Complexity:
+ * O(M), where M is the total number of existing registries.
+ */
+native CountAllMapRegistries();
+
+/*
  * Preallocates storage for a registry before bulk insertion.
  *
  * Reserving capacity in advance reduces reallocations and rehashing while
