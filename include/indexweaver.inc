@@ -21,7 +21,7 @@
  * =============================================================================
  */
 
-#define INDEX_WEAVER_VERSION "1.0.0"
+#define INDEX_WEAVER_VERSION "1.1.0"
 
 /*
  * Maximum capacity accepted by ReserveMapRegistry().
