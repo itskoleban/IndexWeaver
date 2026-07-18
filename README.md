@@ -126,11 +126,7 @@ public OnVehicleDestroy(vehicleid) {
 
 ## API Reference
 
-To use IndexWeaver, include the header in your game mode:
-
-```pawn
-#include <indexweaver>
-```
+All natives return `INVALID_MAP_INDEX` (or `false`) upon failure. It is highly recommended to check for these return values before using retrieved indices in your Pawn arrays.
 
 ### Constants
 
@@ -157,9 +153,7 @@ To use IndexWeaver, include the header in your game mode:
 | `CountMapRegistry(registry_type)` | Returns the exact number of mappings currently stored inside a registry. |
 | `CountAllMapRegistries()`         | Returns the total number of active registries in the storage engine.     |
 
-## Error Handling / Troubleshooting
-
-IndexWeaver provides an internal logger to trace insertions, deletions, and lookups to the server console.
+### Debugging Natives
 
 | Native                         | Description                                             |
 | ------------------------------ | ------------------------------------------------------- |
@@ -171,6 +165,15 @@ IndexWeaver provides an internal logger to trace insertions, deletions, and look
 - `0`: Off (Default)
 - `1`: Errors & Exceptions (Logs invalid parameters and bounds)
 - `2`: Verbose (Traces every insertion, deletion, and lookup)
+
+## Error Handling / Troubleshooting
+
+IndexWeaver does not crash or halt the server on invalid operations. Instead, it returns safe fallback values and logs errors to the open.mp server console if the debug level is set to `1` or higher.
+
+Known internal errors:
+
+- `Invalid capacity:` Attempted to reserve memory exceeding `INDEX_WEAVER_MAX_RESERVED_CAPACITY`.
+- `Lookup failed:` Attempted to retrieve an ID that does not exist (returns `INVALID_MAP_INDEX`).
 
 ## Development & Testing
 
