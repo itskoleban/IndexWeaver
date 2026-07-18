@@ -3,9 +3,9 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Trigger automatically when you push a tag like v1.0.0
+      - "v*" # Trigger automatically when you push a tag like v1.0.0
   pull_request:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:
@@ -26,28 +26,28 @@ jobs:
             output_path: build/IndexWeaver.so
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Install 32-bit Toolchain (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        sudo dpkg --add-architecture i386
-        sudo apt-get update
-        sudo apt-get install -y gcc-multilib g++-multilib
+      - name: Install 32-bit Toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib
 
-    - name: Configure CMake
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }}
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_args }}
 
-    - name: Build Plugin
-      run: cmake --build build --config Release
+      - name: Build Plugin
+        run: cmake --build build --config Release
 
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.artifact_name }}
-        path: ${{ matrix.output_path }}
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.output_path }}
 
   release:
     name: Create GitHub Release
@@ -65,7 +65,7 @@ jobs:
         with:
           name: IndexWeaver.dll
           path: out
-      
+
       - name: Download Linux Artifact
         uses: actions/download-artifact@v4
         with:
