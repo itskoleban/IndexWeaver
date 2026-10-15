@@ -48,7 +48,7 @@ template<class Map> struct Raw {
     void remove(int k){if(r.erase(k)!=1) throw std::runtime_error("remove");}
     std::size_t bytes() const{return 0;}
 };
-std::size_t rss() {
+std::uint64_t rss() {
 #ifdef __linux__
     std::ifstream file("/proc/self/status"); std::string line;
     while(std::getline(file,line)) if(line.starts_with("VmHWM:")) return std::stoull(line.substr(6))*1024;

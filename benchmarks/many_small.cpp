@@ -41,7 +41,7 @@ struct OriginalMany {
     int get(int category, int key) { return store.get(category, key); }
     void remove(int category, int key) { if (!store.remove(category, key)) throw std::runtime_error("remove"); }
 };
-std::size_t rss() {
+std::uint64_t rss() {
 #ifdef __linux__
     std::ifstream file("/proc/self/status"); std::string line;
     while (std::getline(file, line)) if (line.starts_with("VmHWM:")) return std::stoull(line.substr(6)) * 1024;
