@@ -29,6 +29,30 @@ jobs:
       - run: python tools/check_version.py
       - run: cmake -S . -B build -DIW_BUILD_COMPONENT=ON -DIW_BUILD_NATIVE_TESTS=ON -DIW_BUILD_BENCHMARKS=ON ${{ matrix.args }}
       - run: cmake --build build --config ${{ matrix.config }} --parallel 2
+      - name: Locate installed x86 Debug CRT
+        if: runner.os == 'Windows' && matrix.config == 'Debug'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -property installationPath
+          $crt = Get-ChildItem "$vs/VC/Redist/MSVC" -Recurse -Filter msvcp140d.dll | Where-Object { $_.FullName -match '\\x86\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$crt) { throw 'Installed x86 MSVC Debug CRT not found' }
+          $crt.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Append
+          $ucrt = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" -Recurse -Filter ucrtbased.dll | Where-Object { $_.FullName -match '\\x86\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$ucrt) { throw 'Installed x86 Debug UCRT not found' }
+          $ucrt.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Append
+          Write-Output "Debug CRT: $($crt.DirectoryName)"
+          Write-Output "Debug UCRT: $($ucrt.DirectoryName)"
+      - name: Verify Debug test process can start
+        if: runner.os == 'Windows' && matrix.config == 'Debug'
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path build/Debug/iw_tests.exe).Path
+          $process = Start-Process -FilePath $exe -ArgumentList '--invalid-launch-probe' -PassThru -NoNewWindow
+          if (!$process.WaitForExit(15000)) { $process.Kill($true); throw 'Debug test executable did not start/exit within 15 seconds' }
+          $process.Refresh()
+          if ($process.ExitCode -ne 2) { throw "Debug test launch returned $($process.ExitCode), expected its invalid-argument exit code 2" }
+          Write-Output 'Debug test process launch verified; executing the complete suite next'
       - run: ctest --test-dir build -C ${{ matrix.config }} --verbose --output-on-failure --no-tests=error
       - name: Install verified payload
         if: matrix.config == 'Release'
