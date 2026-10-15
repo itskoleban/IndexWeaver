@@ -9,16 +9,32 @@ new Registry:g_Clans = INVALID_REGISTRY;
 new g_AccountID[MAX_PLAYERS];
 new bool:g_HasAccount[MAX_PLAYERS];
 main() {}
-public OnGameModeInit()
+stock bool:InitializeRegistries()
 {
     g_Accounts = Registry_Create(MAX_PLAYERS, true);
+    if (g_Accounts == INVALID_REGISTRY) return false;
     g_Vehicles = Registry_Create(MAX_VEHICLES, true);
+    if (g_Vehicles == INVALID_REGISTRY) return false;
     g_Properties = Registry_Create(MAX_PROPERTIES);
+    if (g_Properties == INVALID_REGISTRY) return false;
     g_Clans = Registry_Create(MAX_CLANS);
-    if (g_Accounts == INVALID_REGISTRY || g_Vehicles == INVALID_REGISTRY ||
-        g_Properties == INVALID_REGISTRY || g_Clans == INVALID_REGISTRY)
+    return g_Clans != INVALID_REGISTRY;
+}
+stock DestroyRegistries()
+{
+    if (g_Accounts != INVALID_REGISTRY) Registry_Destroy(g_Accounts);
+    if (g_Vehicles != INVALID_REGISTRY) Registry_Destroy(g_Vehicles);
+    if (g_Properties != INVALID_REGISTRY) Registry_Destroy(g_Properties);
+    if (g_Clans != INVALID_REGISTRY) Registry_Destroy(g_Clans);
+    g_Accounts = g_Vehicles = g_Properties = g_Clans = INVALID_REGISTRY;
+}
+public OnGameModeInit()
+{
+    if (!InitializeRegistries())
     {
+        // Report the first failure before cleanup replaces the per-script error.
         printf("Registry initialization failed: %d", _:Registry_GetLastError());
+        DestroyRegistries();
         return 0;
     }
     return 1;
@@ -86,10 +102,6 @@ stock bool:BeginPropertyReload(expected_rows)
 public OnGameModeExit()
 {
     // Explicit cleanup permits deterministic early release. AMX unload also cleans up.
-    if (g_Accounts != INVALID_REGISTRY) Registry_Destroy(g_Accounts);
-    if (g_Vehicles != INVALID_REGISTRY) Registry_Destroy(g_Vehicles);
-    if (g_Properties != INVALID_REGISTRY) Registry_Destroy(g_Properties);
-    if (g_Clans != INVALID_REGISTRY) Registry_Destroy(g_Clans);
-    g_Accounts = g_Vehicles = g_Properties = g_Clans = INVALID_REGISTRY;
+    DestroyRegistries();
     return 1;
 }
