@@ -50,6 +50,8 @@ Do not disable failing sanitizers to make CI green. If an execution sandbox bloc
 
 `iw_native_tests` registers the actual native table against a **mock AMX**, exercises all 22 natives, argument counts, error states, cross-owner rejection, output aliases, alignment, heap/stack gap, unchanged failed outputs, reset and unload. It is not a server integration test and cannot establish the SDK runtime ABI.
 
+`iw_allocation_tests` is an isolated executable replacing scalar/array and aligned global allocation functions. It rebuilds each scenario and fails each allocation in turn until the operation completes: new/repeated owner load, forward/reverse registry creation with/without reservation, and legacy-category creation plus insertion. It verifies no published or consumed handle after failed creation, ownership isolation, retry success, balanced allocation/deallocation counts and allocation-free cleanup. With `IW_BUILD_NATIVE_TESTS=ON`, the same injection exercises actual Create/Set/legacy Set/clear-with-release native entry points against a mock AMX, requiring the allocation error and unchanged associations before retry. This supplements Registry PMR tests; it does not claim exhaustive enumeration of every possible manager state or compiler/runtime allocation policy.
+
 Compile the shipped Pawn example and runtime fixture using pinned compiler/include submodules:
 
 ```sh

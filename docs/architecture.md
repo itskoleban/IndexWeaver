@@ -32,6 +32,8 @@ Conflicting reverse assignments never displace another ID. Replacing an existing
 
 Allocation failure leaves associations unchanged. Rehash/reserve failure may change bucket counts and allocated capacity; memory footprint is not transactional. Empty legacy categories created by a failed write may remain allocated, but contain no mappings and are not counted as active categories.
 
+Failed registry creation does not publish or consume a handle. Owner loading starts a new lifetime by unloading the old one first; if allocating the replacement context fails, the owner is left unloaded, its old handles remain invalid and other owners are unaffected. Initialization logs the failure and cleans up the owner. Repeated load does not promise rollback to the prior script lifetime.
+
 ## Container decision
 
 Use `std::pmr::unordered_map` with a small deterministic 32-bit mixing hash. The standard container supplies documented exception/invalidation behavior, stable forward entry iterators when only the separate reverse table changes, portable allocators, and an injectable memory resource for allocation-failure tests. The hash avoids trivial identity-hash clustering for sparse integers; it is not adversarial collision protection. Ordinary hash tables still have linear worst-case behavior.
