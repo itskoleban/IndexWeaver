@@ -36,6 +36,8 @@ Use a separate build directory per architecture/toolchain/configuration. `IW_BUI
 
 GCC/Clang sanitizer development (native x64 core):
 
+`IW_SANITIZERS=ON` is rejected for MSVC/unsupported compilers rather than silently building without the requested ASan/UBSan instrumentation.
+
 ```sh
 cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DIW_SANITIZERS=ON -DIW_BUILD_NATIVE_TESTS=ON
 cmake --build build-asan --parallel 2

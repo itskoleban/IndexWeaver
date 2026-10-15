@@ -106,3 +106,9 @@ Added management-inclusive many-small-registry benchmarks: 10/1,000/10,000 regis
 ## Example initialization review
 
 The multi-registry Pawn example previously created all four registries before checking for failure, allowing a later successful native to erase the first allocation error. Initialization now stops at the first failed creation, reports that error before any cleanup natives, and destroys any registries already created. Normal shutdown uses the same cleanup helper. All three shipped Pawn sources recompiled with compiler 3.10.11 without warnings after this correction.
+
+## Final build/iterator audit
+
+An independent default Release build (component and native tests disabled) passed 4/4 suites, preserving the no-SDK storage-engine workflow. Debug with libstdc++ checked iterators (`-D_GLIBCXX_DEBUG`) passed 5/5, including the modeled ten-million-operation churn case. This is GNU checked-iterator evidence, not a substitute for MSVC Debug or Windows server runtime checks.
+
+Both benchmark executables compiled on Linux x86 with strict project warnings after changing process-RSS result types to `uint64_t`, avoiding narrowing a 64-bit process metric to 32-bit size_t. This diagnostic-only change does not alter benchmark workloads or the recorded x64 measurements; the saved source hashes identify the exact pre-change measured source. CMake now rejects the ASan/UBSan option on unsupported compilers (including MSVC) instead of silently ignoring a requested instrumentation mode. GNU sanitizer configuration remains valid. Current CI must be inspected separately before approval.
