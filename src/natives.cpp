@@ -1,188 +1,120 @@
-/**
- * @file natives.cpp
- * @brief Implementation of the open.mp Pawn API natives.
- *
- * This file maps the C++ AMX natives exported to Pawn into the internal
- * methods of the global IndexRegistryStore.
- */
-
 #include "natives.hpp"
-#include "mapper_store.hpp"
-
-#include <Server/Components/Pawn/Impl/pawn_natives.hpp>
-
-/**
- * @brief Registers or updates an ID-to-Index mapping.
- *
- * Maps a generic identifier (e.g. database ID) to a specific array index.
- * If the mapping already exists, the index is safely overwritten.
- *
- * @param registryType The category ID to store this mapping under.
- * @param id The unique identifier to be mapped.
- * @param index The actual array index where the object is stored.
- * @return true if successful, false if parameters are invalid.
- */
-SCRIPT_API(SetMapIndex, bool(int registryType, int id, int index))
-{
-	return gIndexWeaverStore ? gIndexWeaverStore->set(registryType, id, index) : false;
+#include <cstdio>
+#include <exception>
+#include <stdexcept>
+namespace index_weaver {
+namespace {
+Manager* manager = nullptr; // Non-owning binding, valid only while the component is loaded.
+enum class Op { Create, Destroy, Set, Insert, Index, ID, Has, Remove, Clear, Reserve, Count, Stats, Error,
+    LegacySet, LegacyGet, LegacyHas, LegacyRemove, LegacyClear, LegacyClearAll, LegacyReserve,
+    LegacyCount, LegacyCountAll };
+cell* output(AMX* amx, cell address) noexcept {
+    // Validate the complete aligned cell, excluding the unallocated heap/stack gap.
+    constexpr cell bytes = sizeof(cell);
+    if (address < 0 || address % bytes || amx->stp < bytes || address > amx->stp-bytes)
+        return nullptr;
+    if (!(address <= amx->hea-bytes || address >= amx->stk)) return nullptr;
+    cell* result = nullptr;
+    if (amx_GetAddr(amx,address,&result) != AMX_ERR_NONE) return nullptr;
+    return result;
 }
-
-/**
- * @brief Retrieves the array index associated with a specific ID.
- *
- * Performs an O(1) lookup in the registry to find the index.
- *
- * @param registryType The category ID to search within.
- * @param id The unique identifier to look up.
- * @return The mapped index, or INVALID_INDEX (-1) if not found.
- */
-SCRIPT_API(GetMapIndex, int(int registryType, int id))
-{
-	return gIndexWeaverStore ? gIndexWeaverStore->get(registryType, id)
-							 : index_weaver::IndexRegistryStore::INVALID_INDEX;
+cell narrow(std::size_t n) {
+    if (n > static_cast<std::size_t>(std::numeric_limits<cell>::max())) throw std::length_error("Pawn cell overflow");
+    return static_cast<cell>(n);
 }
-
-/**
- * @brief Removes a specific mapping from a registry.
- *
- * Safely erases the ID from the registry without leaking memory.
- *
- * @param registryType The category ID to remove from.
- * @param id The unique identifier to erase.
- * @return true if the ID existed and was removed, false otherwise.
- */
-SCRIPT_API(RemoveMapIndex, bool(int registryType, int id))
-{
-	return gIndexWeaverStore ? gIndexWeaverStore->remove(registryType, id) : false;
+template<Op operation, int arguments>
+cell AMX_NATIVE_CALL native(AMX* amx, const cell* p) noexcept {
+    constexpr cell failure = operation==Op::LegacyGet ? -1 : 0;
+    if (!manager || !amx || !manager->loaded(amx)) return failure;
+    if (!p || p[0] != arguments*static_cast<cell>(sizeof(cell))) {
+        manager->error(amx,Error::InvalidArgument); return failure;
+    }
+    if constexpr (operation==Op::Error) return static_cast<cell>(manager->error(amx));
+    manager->error(amx,Error::None);
+    try {
+        if constexpr (operation==Op::Create) {
+            if(p[1]<0 || (p[2]!=0 && p[2]!=1)) { manager->error(amx,Error::InvalidArgument); return 0; }
+            return manager->create(amx,p[2]!=0,static_cast<std::size_t>(p[1]));
+        } else if constexpr (operation==Op::Destroy) return manager->destroy(amx,p[1]);
+        else if constexpr (operation==Op::LegacyClearAll) { manager->clearLegacyAll(amx); return 1; }
+        else if constexpr (operation==Op::LegacyCountAll) return narrow(manager->countLegacy(amx));
+        else if constexpr (operation==Op::LegacyClear) {
+            bool ok=manager->clearLegacy(amx,p[1]);
+            if(!ok) manager->error(amx,p[1]<0?Error::InvalidArgument:Error::Missing);
+            return ok;
+        } else {
+            constexpr bool legacy = operation>=Op::LegacySet;
+            Registry* r;
+            if constexpr(legacy) {
+                if constexpr(operation==Op::LegacySet) {
+                    if(p[3]<0) { manager->error(amx,Error::InvalidArgument); return failure; }
+                }
+                if constexpr(operation==Op::LegacyReserve) {
+                    // Preserve the 1.x compatibility reservation contract.
+                    if(p[2]<=0 || p[2]>10000000) { manager->error(amx,Error::InvalidArgument); return failure; }
+                }
+                r=manager->legacy(amx,p[1],operation==Op::LegacySet || operation==Op::LegacyReserve);
+            } else r=manager->get(amx,p[1]);
+            if(!r) return failure;
+            if constexpr(operation==Op::Set || operation==Op::Insert || operation==Op::LegacySet) {
+                auto e=r->set(p[2],p[3],operation==Op::Insert); manager->error(amx,e); return e==Error::None;
+            } else if constexpr(operation==Op::Index || operation==Op::ID) {
+                auto* target=output(amx,p[3]);
+                if(!target) { manager->error(amx,Error::InvalidReference); return 0; }
+                if constexpr(operation==Op::ID) {
+                    if(!r->bidirectional()) { manager->error(amx,Error::NotBidirectional); return 0; }
+                    if(p[2]<0) { manager->error(amx,Error::InvalidArgument); return 0; }
+                }
+                auto result=operation==Op::Index?r->index(p[2]):r->id(p[2]);
+                if(!result) { manager->error(amx,Error::Missing); return 0; }
+                *target=*result; return 1;
+            } else if constexpr(operation==Op::Has || operation==Op::LegacyHas || operation==Op::LegacyGet) {
+                auto result=r->index(p[2]);
+                if(!result) { manager->error(amx,Error::Missing); return failure; }
+                if constexpr(operation==Op::LegacyGet) return *result;
+                return 1;
+            } else if constexpr(operation==Op::Remove || operation==Op::LegacyRemove) {
+                bool ok=r->remove(p[2]); if(!ok) manager->error(amx,Error::Missing); return ok;
+            } else if constexpr(operation==Op::Clear) {
+                if(p[2]!=0 && p[2]!=1) { manager->error(amx,Error::InvalidArgument); return 0; }
+                r->clear(p[2]!=0); return 1;
+            } else if constexpr(operation==Op::Reserve || operation==Op::LegacyReserve) {
+                if(p[2]<0) { manager->error(amx,Error::InvalidArgument); return 0; }
+                r->reserve(static_cast<std::size_t>(p[2])); return 1;
+            } else if constexpr(operation==Op::Count || operation==Op::LegacyCount) return narrow(r->size());
+            else if constexpr(operation==Op::Stats) {
+                auto* count=output(amx,p[2]); auto* buckets=output(amx,p[3]); auto* reverse=output(amx,p[4]);
+                if(!count || !buckets || !reverse || count==buckets || count==reverse || buckets==reverse) {
+                    manager->error(amx,Error::InvalidReference); return 0;
+                }
+                auto c=narrow(r->size()); auto b=narrow(r->buckets());
+                *count=c; *buckets=b; *reverse=r->bidirectional(); return 1;
+            }
+        }
+    } catch(const std::bad_alloc&) { manager->error(amx,Error::Allocation); }
+    catch(const std::length_error&) { manager->error(amx,Error::Capacity); }
+    catch(const std::exception& e) {
+        std::fprintf(stderr,"[IndexWeaver] unexpected native exception: %s\n",e.what());
+        manager->error(amx,Error::Internal);
+    } catch(...) {
+        std::fputs("[IndexWeaver] unexpected non-standard native exception\n",stderr);
+        manager->error(amx,Error::Internal);
+    }
+    return failure;
 }
-
-/**
- * @brief Checks if a specific ID is currently mapped.
- *
- * @param registryType The category ID to search within.
- * @param id The unique identifier to check.
- * @return true if the ID is mapped, false otherwise.
- */
-SCRIPT_API(HasMapIndex, bool(int registryType, int id))
-{
-	return gIndexWeaverStore ? gIndexWeaverStore->has(registryType, id) : false;
+#define N(name, op, count) {name, &native<Op::op,count>}
+const AMX_NATIVE_INFO natives[] = {
+    N("Registry_Create",Create,2), N("Registry_Destroy",Destroy,1), N("Registry_Set",Set,3),
+    N("Registry_Insert",Insert,3), N("Registry_TryGetIndex",Index,3), N("Registry_TryGetID",ID,3),
+    N("Registry_Has",Has,2), N("Registry_Remove",Remove,2), N("Registry_Clear",Clear,2),
+    N("Registry_Reserve",Reserve,2), N("Registry_Count",Count,1), N("Registry_GetStats",Stats,4),
+    N("Registry_GetLastError",Error,0), N("SetMapIndex",LegacySet,3), N("GetMapIndex",LegacyGet,2),
+    N("HasMapIndex",LegacyHas,2), N("RemoveMapIndex",LegacyRemove,2), N("ClearMapRegistry",LegacyClear,1),
+    N("ClearAllMapRegistries",LegacyClearAll,0), N("ReserveMapRegistry",LegacyReserve,2),
+    N("CountMapRegistry",LegacyCount,1), N("CountAllMapRegistries",LegacyCountAll,0)
+};
+#undef N
 }
-
-/**
- * @brief Wipes all mappings within a specific registry category.
- *
- * Completely clears a registry while leaving other registries untouched.
- *
- * @param registryType The category ID to wipe.
- * @return true if the registry existed and was cleared, false otherwise.
- */
-SCRIPT_API(ClearMapRegistry, bool(int registryType))
-{
-	return gIndexWeaverStore ? gIndexWeaverStore->clearType(registryType) : false;
-}
-
-/**
- * @brief Performs a hard reset on the entire storage engine.
- *
- * Wipes every single registry and mapping currently stored in memory.
- */
-SCRIPT_API(ClearAllMapRegistries, void())
-{
-	if (gIndexWeaverStore)
-	{
-		gIndexWeaverStore->clearAll();
-	}
-}
-
-/**
- * @brief Pre-allocates memory for a specific registry.
- *
- * Optimizes memory usage and prevents rehashing when bulk-inserting
- * thousands of elements (e.g., loading database entries on boot).
- *
- * @param registryType The category ID to pre-allocate.
- * @param capacity The number of elements to reserve space for.
- * @return true if successful, false on invalid parameters or failure.
- */
-SCRIPT_API(ReserveMapRegistry, bool(int registryType, int capacity))
-{
-	return (gIndexWeaverStore && capacity > 0)
-			   ? gIndexWeaverStore->reserve(registryType, static_cast<std::size_t>(capacity))
-			   : false;
-}
-
-/**
- * @brief Sets the internal verbosity level of the component's logger.
- *
- * Useful for debugging mapping failures or observing the internal behavior.
- * 0 = Off, 1 = Errors Only, 2 = Verbose (Logs everything).
- *
- * @param level The debug level to apply.
- * @return true on success, false if the level is out of bounds.
- */
-SCRIPT_API(SetMapDebugLevel, bool(int level))
-{
-	if (!gIndexWeaverStore)
-	{
-		return false;
-	}
-
-	// Validate bounds manually to prevent invalid enum casts
-	if (level < 0 || level > 2)
-	{
-		return false;
-	}
-
-	gIndexWeaverStore->setDebugLevel(
-		static_cast<index_weaver::IndexRegistryStore::DebugLevel>(level));
-
-	return true;
-}
-
-/**
- * @brief Retrieves the current internal verbosity level of the component.
- *
- * @return The current debug level as an integer (0, 1, or 2).
- */
-SCRIPT_API(GetMapDebugLevel, int())
-{
-	if (!gIndexWeaverStore)
-	{
-		return 0;
-	}
-
-	return static_cast<int>(gIndexWeaverStore->debugLevel());
-}
-
-/**
- * @brief Retrieves the total number of mappings stored in a specific registry.
- *
- * @param registryType The category ID to query.
- * @return The number of elements currently mapped in the registry.
- */
-SCRIPT_API(CountMapRegistry, int(int registryType))
-{
-	if (!gIndexWeaverStore)
-	{
-		return 0;
-	}
-
-	return static_cast<int>(gIndexWeaverStore->count(registryType));
-}
-
-/**
- * @brief Retrieves the total number of active registries.
- *
- * An active registry is one that contains at least one mapping.
- *
- * @return The total number of active registries in the storage engine.
- */
-SCRIPT_API(CountAllMapRegistries, int())
-{
-	if (!gIndexWeaverStore)
-	{
-		return 0;
-	}
-
-	return static_cast<int>(gIndexWeaverStore->totalRegistries());
+void bindNatives(Manager* value) noexcept { manager=value; }
+int registerNatives(AMX* amx) { return amx_Register(amx,natives,static_cast<int>(std::size(natives))); }
 }

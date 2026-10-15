@@ -1,0 +1,94 @@
+name: CI
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  component:
+    name: ${{ matrix.platform }} / ${{ matrix.config }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux-x86, config: Release, args: '-DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32'}
+          - {os: ubuntu-24.04, platform: linux-x86, config: Debug, args: '-DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32'}
+          - {os: windows-2022, platform: windows-x86, config: Release, args: '-A Win32'}
+          - {os: windows-2022, platform: windows-x86, config: Debug, args: '-A Win32'}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+      - name: Linux x86 toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++-multilib
+      - run: python tools/check_version.py
+      - run: cmake -S . -B build -DIW_BUILD_COMPONENT=ON -DIW_BUILD_NATIVE_TESTS=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }}
+      - run: cmake --build build --config ${{ matrix.config }} --parallel 2
+      - run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure --no-tests=error
+      - name: Install verified payload
+        if: matrix.config == 'Release'
+        run: cmake --install build --config Release --prefix stage
+      - name: Package
+        if: matrix.config == 'Release'
+        run: python tools/package.py stage ${{ matrix.platform }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.config == 'Release'
+        with:
+          name: ${{ matrix.platform }}
+          path: out/*
+          if-no-files-found: error
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DIW_SANITIZERS=ON -DIW_BUILD_NATIVE_TESTS=ON
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure --no-tests=error
+  pawn:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+      - run: cmake -S lib/compiler/source/compiler -B build-pawn -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS=-DPAWN_CELL_SIZE=32 -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build-pawn --target pawncc --parallel 2
+      - run: python tools/check_pawn.py build-pawn/pawncc
+  integration:
+    name: Real open.mp Linux x86 lifecycle
+    needs: component
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-x86
+          path: artifacts
+      - name: Runtime and compiler prerequisites
+        run: sudo apt-get update && sudo apt-get install -y g++-multilib
+      - name: Retrieve pinned server distribution
+        run: |
+          curl --fail --location --retry 3 https://github.com/openmultiplayer/open.mp/releases/download/v1.6.7.3218/open.mp-linux-x86.tar.gz -o server.tar.gz
+          echo '0f7bfe70bb68ea780fe24a910b69412046e53d10feb65a9d4a9de8ff1f7f1329  server.tar.gz' | sha256sum --check
+          mkdir server
+          tar -xzf server.tar.gz -C server
+          mkdir package
+          cd artifacts
+          sha256sum --check *.sha256
+          unzip '*.zip' -d ../package
+      - run: cmake -S lib/compiler/source/compiler -B build-pawn -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS=-DPAWN_CELL_SIZE=32 -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build-pawn --target pawncc --parallel 2
+      - run: python tools/server_smoke.py --server server/Server --component package/components/IndexWeaver.so --compiler build-pawn/pawncc --log integration-result.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: integration-evidence
+          path: integration-result.txt
+          if-no-files-found: warn

@@ -4,6 +4,6 @@
 [submodule "lib/compiler"]
 	path = lib/compiler
 	url = https://github.com/openmultiplayer/compiler.git
-[submodule "lib/pawn-natives"]
-	path = lib/pawn-natives
-	url = https://github.com/openmultiplayer/pawn-natives.git
+[submodule "lib/omp-stdlib"]
+	path = lib/omp-stdlib
+	url = https://github.com/openmultiplayer/omp-stdlib.git
