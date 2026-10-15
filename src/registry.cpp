@@ -51,10 +51,15 @@ bool Registry::remove(Value key) noexcept {
     forward_.erase(it);
     return true;
 }
-void Registry::clear(bool release) noexcept {
+void Registry::clear(bool release) {
     if (release) {
-        Map empty(forward_.get_allocator().resource()); forward_.swap(empty);
-        if (reverse_) { Map back(reverse_->get_allocator().resource()); reverse_->swap(back); }
+        // Some standard libraries allocate even for an empty map. Construct both
+        // replacements before committing either swap, so release is transactional.
+        Map empty(forward_.get_allocator().resource());
+        if (reverse_) {
+            Map back(reverse_->get_allocator().resource());
+            forward_.swap(empty); reverse_->swap(back);
+        } else forward_.swap(empty);
     } else {
         forward_.clear();
         if (reverse_) reverse_->clear();

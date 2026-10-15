@@ -39,7 +39,7 @@ Documentation covers all implemented natives, error numbers, ownership, memory r
 - GCC 13.3.0 x64 Release CMake build, strict project warnings: passed.
 - CTest Release: core, million-mapping stress and actual native bridge with mock AMX: 3/3 passed.
 - Core randomized comparison: 100,000 operations per direction/mode, deterministic reference model and invariant checks; passed.
-- Allocation injection: failures across node allocation and rehash boundaries, insertion/reassignment/reservation; invariant and final resource-byte balance checks passed.
+- Allocation injection: failures across node allocation and rehash boundaries, insertion/reassignment/reservation/release; invariant and final resource-byte balance checks passed.
 - Lifecycle: repeated ownership initialization/cleanup, 10,000 creation/destruction cycles and 1,000 simultaneously populated registries; passed.
 - GCC x64 Debug ASan+UBSan: 3/3 suites passed with local leak detection disabled **only because default LeakSanitizer failed process introspection under this host's /proc restrictions**. The initial LSan attempt failed with its own fatal diagnostic. No local LSan pass is claimed; CI retains full default sanitizer/leak checking.
 - Official pinned Pawn compiler 3.10.11 built from source. All shipped examples and both runtime fixtures compiled without warnings against pinned open.mp includes. The upstream compiler's own CMake/deprecation/packed-header warnings are not project compiler warnings.
@@ -58,12 +58,20 @@ On this x64 libstdc++ build, counting-resource requested table bytes for one mil
 
 The standard container choice is provisional for maintainer review: correctness guarantees, testable allocation behavior and no extra engine dependency justify a simpler initial design, but throughput/memory regressions matter for production budgets. Replacing it with a flat table requires proof of rollback/exception semantics and the same tests, not just faster average measurements. No production acceptance threshold or x86 latency claim is invented.
 
+## First CI feedback
+
+The first PR CI run confirmed Linux x86 Debug/Release, Pawn compilation, and the full default ASan/UBSan/LeakSanitizer job. Windows Release correctly rejected the initial test's assumption that releasing an empty map leaves zero allocated bytes (`test_core.cpp:57`). The portability correction below addresses both that invalid assumption and the associated clear/release exception-safety issue; current-head CI must be checked separately. Historical failed runs are retained, not described as passing.
+
+## Final portability audit
+
+Review identified that MSVC's standard unordered_map may allocate for an empty map, unlike the tested libstdc++ implementation. Clear-with-release therefore constructs both replacements before either swap and propagates allocation failure through the native guard; it is not incorrectly marked noexcept. Tests compare post-release allocation with the implementation's empty-registry baseline, then require zero bytes after destruction. Core symbols are hidden from the component export table; the validated Linux binary exports only ComponentEntryPoint. Repeated packaging excludes its previous manifest to avoid hashing the manifest itself.
+
 ## Compatibility and remaining release gates
 
 - 2.0 is breaking: script-private compatibility categories, removed debug-level natives, explicit lifecycle and reverse uniqueness rules. Existing signed-ID/nonnegative-index semantics remain. See [migration](migration.md).
 - Native Windows server runtime is not tested locally. Windows x86 build and test evidence must come from CI; Linux x86 runtime evidence is currently emulated locally and repeated natively in CI.
 - Review all new CI results before approval. Do not infer green status from local results. Release workflow is implemented but has not been exercised with a release tag; no tag, merge or release publication is authorized by this change.
-- Full local LeakSanitizer validation remains blocked by host introspection restrictions; CI must supply it.
+- Full local LeakSanitizer validation remains blocked by host introspection restrictions; The initial PR CI supplied full leak-check evidence for its head; subsequent CI must retain that check.
 - Exact cross-container allocation accounting, sustained multi-million mixed churn profiling, many-small-registry performance distributions, adversarial collision studies and Windows runtime reload coverage are not completed. Existing million-scale stress/randomized churn tests are correctness evidence, not a full server soak.
 - Allocation-failure injection covers Registry's PMR allocations; manager/global operator-new failure paths are guarded but not exhaustively injected.
 - The handle exhaustion boundary is checked in code; issuing 2.1 billion handles was not stress-tested. Component binary hot replacement while AMXs hold native pointers is unsupported.

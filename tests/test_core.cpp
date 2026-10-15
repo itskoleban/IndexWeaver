@@ -43,7 +43,7 @@ void functional() {
 void allocation() {
     for (int budget=0; budget<12; ++budget) {
         Memory m;
-        { Registry b(true,&m); b.reserve(2); CHECK(b.set(1,1) == Error::None); CHECK(b.set(2,2) == Error::None);
+        { Registry b(true,&m); const auto emptyBytes=m.bytes; b.reserve(2); CHECK(b.set(1,1) == Error::None); CHECK(b.set(2,2) == Error::None);
           m.untilFailure=budget;
           try { CHECK(b.set(3,3) == Error::None); } catch (const std::bad_alloc&) { CHECK(!b.index(3)); CHECK(!b.id(3)); }
           CHECK(b.invariant()); CHECK(b.index(1) == 1);
@@ -53,8 +53,12 @@ void allocation() {
           m.untilFailure=budget;
           auto count=b.size();
           try { b.reserve(500); } catch (const std::bad_alloc&) { CHECK(b.size()==count); }
+          CHECK(b.invariant()); m.untilFailure=budget;
+          count=b.size();
+          try { b.clear(true); CHECK(b.size()==0); }
+          catch (const std::bad_alloc&) { CHECK(b.size()==count); }
           CHECK(b.invariant()); m.untilFailure=-1;
-          b.clear(true); CHECK(m.bytes==0);
+          b.clear(true); CHECK(m.bytes==emptyBytes);
         } CHECK(m.bytes==0);
     }
 }

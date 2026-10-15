@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
   pull_request:
   workflow_call:
 permissions:
@@ -19,7 +19,7 @@ jobs:
           - {os: windows-2022, platform: windows-x86, config: Release, args: '-A Win32'}
           - {os: windows-2022, platform: windows-x86, config: Debug, args: '-A Win32'}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
       - name: Linux x86 toolchain
@@ -35,7 +35,7 @@ jobs:
       - name: Package
         if: matrix.config == 'Release'
         run: python tools/package.py stage ${{ matrix.platform }}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: matrix.config == 'Release'
         with:
           name: ${{ matrix.platform }}
@@ -44,7 +44,7 @@ jobs:
   sanitizers:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DIW_SANITIZERS=ON -DIW_BUILD_NATIVE_TESTS=ON
@@ -53,7 +53,7 @@ jobs:
   pawn:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
       - run: cmake -S lib/compiler/source/compiler -B build-pawn -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS=-DPAWN_CELL_SIZE=32 -DCMAKE_BUILD_TYPE=Release
@@ -64,10 +64,10 @@ jobs:
     needs: component
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           submodules: recursive
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: linux-x86
           path: artifacts
@@ -86,7 +86,7 @@ jobs:
       - run: cmake -S lib/compiler/source/compiler -B build-pawn -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS=-DPAWN_CELL_SIZE=32 -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build-pawn --target pawncc --parallel 2
       - run: python tools/server_smoke.py --server server/Server --component package/components/IndexWeaver.so --compiler build-pawn/pawncc --log integration-result.txt
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: integration-evidence
