@@ -27,9 +27,9 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y g++-multilib
       - run: python tools/check_version.py
-      - run: cmake -S . -B build -DIW_BUILD_COMPONENT=ON -DIW_BUILD_NATIVE_TESTS=ON ${{ matrix.args }}
+      - run: cmake -S . -B build -DIW_BUILD_COMPONENT=ON -DIW_BUILD_NATIVE_TESTS=ON -DIW_BUILD_BENCHMARKS=ON ${{ matrix.args }}
       - run: cmake --build build --config ${{ matrix.config }} --parallel 2
-      - run: ctest --test-dir build -C ${{ matrix.config }} --output-on-failure --no-tests=error
+      - run: ctest --test-dir build -C ${{ matrix.config }} --verbose --output-on-failure --no-tests=error
       - name: Install verified payload
         if: matrix.config == 'Release'
         run: cmake --install build --config Release --prefix stage
@@ -51,7 +51,7 @@ jobs:
           submodules: recursive
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DIW_SANITIZERS=ON -DIW_BUILD_NATIVE_TESTS=ON
       - run: cmake --build build --parallel 2
-      - run: ctest --test-dir build --output-on-failure --no-tests=error
+      - run: ctest --test-dir build --verbose --output-on-failure --no-tests=error
   pawn:
     timeout-minutes: 10
     runs-on: ubuntu-24.04

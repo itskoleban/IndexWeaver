@@ -1,9 +1,11 @@
 #include "manager.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <random>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 using namespace index_weaver;
 #define CHECK(...) do { if (!(__VA_ARGS__)) { std::cerr << __FILE__ << ':' << __LINE__ << ": " << #__VA_ARGS__ << '\n'; std::exit(1); } } while(false)
@@ -83,12 +85,12 @@ void lifecycle() {
     m.unload(&a); m.unload(&a); m.reset(); m.shutdown(); m.shutdown();
     CHECK(!m.loaded(&a)); m.load(&a); CHECK(m.create(&a,false,0)>handles.back());
 }
-void randomized(bool reverse) {
+void randomized(bool reverse, int iterations, unsigned keySpace) {
     Registry registry(reverse); std::map<Value,Value> reference;
     std::mt19937 rng(0x152060U);
-    for(int n=0;n<100000;++n) {
-        auto key=static_cast<Value>(rng()%401)-200;
-        auto value=static_cast<Value>(rng()%401);
+    for(int n=0;n<iterations;++n) {
+        auto key=static_cast<Value>(rng()%keySpace)-static_cast<Value>(keySpace/2);
+        auto value=static_cast<Value>(rng()%keySpace);
         auto op=rng()%8;
         if(op<4) {
             const bool only=op==0;
@@ -115,11 +117,89 @@ void stress() {
     for(int i=count-1;i>=0;--i) { CHECK(r.index(i*1009)==i); CHECK(r.id(i)==i*1009); CHECK(r.remove(i*1009)); }
     CHECK(r.size()==0); CHECK(r.invariant());
 }
-int main(int argc, char**) {
-    if(argc>1) {
-        stress(); std::cout << "PASS: million sparse bidirectional mappings\n";
-    } else {
-        functional(); allocation(); lifecycle(); randomized(false); randomized(true);
-        std::cout << "PASS: functional, allocation rollback, lifecycle, randomized\n";
+void churn(bool bidirectional) {
+    // Bounded independent array model: -1 denotes an absent mapping because
+    // indices are nonnegative. Sparse signed keys remain within the cell range.
+    constexpr int slots = 32768, operations = 5000000;
+    Memory memory;
+    {
+        Registry r(bidirectional, &memory);
+        std::vector<Value> forward(slots, -1), reverse(slots * 2, -1);
+        std::mt19937 random(0x20261015U);
+        std::size_t count = 0;
+        auto key = [](int slot) -> Value { return slot * 65537 - 1073741824; };
+        auto verify = [&] {
+            CHECK(r.invariant()); CHECK(r.size() == count);
+            for (int slot = 0; slot < slots; ++slot) {
+                auto expected = forward[static_cast<std::size_t>(slot)];
+                CHECK(r.index(key(slot)) == (expected < 0 ? std::nullopt : std::optional<Value>(expected)));
+            }
+            if (bidirectional) for (int index = 0; index < slots * 2; ++index) {
+                auto slot = reverse[static_cast<std::size_t>(index)];
+                CHECK(r.id(index) == (slot < 0 ? std::nullopt : std::optional<Value>(key(slot))));
+            }
+        };
+        for (int step = 0; step < operations; ++step) {
+            const auto slot = static_cast<int>(random() % slots);
+            const auto value = static_cast<int>(random() % (slots * 2));
+            const auto operation = random() % 10;
+            auto& old = forward[static_cast<std::size_t>(slot)];
+            if (operation < 5) {
+                const bool insertOnly = operation == 0;
+                Error expected = Error::None;
+                if (insertOnly && old >= 0) expected = Error::DuplicateID;
+                else if (bidirectional && reverse[static_cast<std::size_t>(value)] >= 0 &&
+                    reverse[static_cast<std::size_t>(value)] != slot) expected = Error::OccupiedIndex;
+                CHECK(r.set(key(slot), value, insertOnly) == expected);
+                if (expected == Error::None) {
+                    if (old < 0) ++count;
+                    else if (bidirectional) reverse[static_cast<std::size_t>(old)] = -1;
+                    old = value;
+                    if (bidirectional) reverse[static_cast<std::size_t>(value)] = slot;
+                }
+            } else if (operation < 8) {
+                CHECK(r.remove(key(slot)) == (old >= 0));
+                if (old >= 0) {
+                    if (bidirectional) reverse[static_cast<std::size_t>(old)] = -1;
+                    old = -1; --count;
+                }
+            } else {
+                CHECK(r.index(key(slot)) == (old < 0 ? std::nullopt : std::optional<Value>(old)));
+                if (bidirectional) {
+                    const auto owner = reverse[static_cast<std::size_t>(value)];
+                    CHECK(r.id(value) == (owner < 0 ? std::nullopt : std::optional<Value>(key(owner))));
+                }
+            }
+            CHECK(r.size() == count);
+            if (step % 4096 == 0) CHECK(r.invariant());
+            if ((step + 1) % 1000000 == 0) {
+                verify();
+                r.clear((step + 1) % 2000000 == 0);
+                std::fill(forward.begin(), forward.end(), -1);
+                std::fill(reverse.begin(), reverse.end(), -1);
+                count = 0; r.reserve(slots);
+            }
+        }
+        verify();
     }
+    CHECK(memory.bytes == 0);
+}
+int main(int argc, char** argv) {
+    if (argc == 2 && std::string_view(argv[1]) == "churn") {
+        churn(false); churn(true);
+        std::cout << "PASS: 10 million mixed sparse signed-ID operations, both modes, independent forward/reverse models and balanced PMR allocations\n";
+    } else if (argc == 2 && std::string_view(argv[1]) == "stress") {
+        stress(); std::cout << "PASS: million sparse bidirectional mappings\n";
+    } else if (argc == 1) {
+        std::cout << "[core] functional\n" << std::flush; functional();
+        std::cout << "[core] allocation rollback\n" << std::flush; allocation();
+        std::cout << "[core] ownership and lifecycle\n" << std::flush; lifecycle();
+        for(bool reverse : {false,true}) {
+            std::cout << "[core] reference model reverse=" << reverse << " small\n" << std::flush;
+            randomized(reverse,100000,65);
+            std::cout << "[core] reference model reverse=" << reverse << " medium\n" << std::flush;
+            randomized(reverse,10000,401);
+        }
+        std::cout << "PASS: functional, allocation rollback, lifecycle, 220000 randomized operations\n";
+    } else return 2;
 }

@@ -20,3 +20,14 @@ Timing uses the default memory resource, **without a counting wrapper**. Separat
 No universal speed claim follows from these cloud-host microbenchmarks. CPU scheduling, frequency and allocator/page effects produce variation; raw observations and medians/min/max/sample standard deviations are retained. Results are architecture/compiler specific. This run's x64 measurements do not establish x86 server latency. In particular, bidirectional update pays for allocating a new reverse entry before deleting the previous one to preserve associations on allocation failure.
 
 See [recorded measurements](measurements/2026-10-15-linux-x64/README.md). The standard container is deliberately chosen for specified allocation/invalidation behavior, simple failure injection and no new engine dependency. It is often slower and uses more memory than Robin Hood. This trade-off requires maintainer review against actual production budgets before release; the project is not advertised as faster than 1.x.
+
+## Many simultaneous small registries
+
+`iw_many_small_benchmark` adds management-inclusive measurements against the frozen original store. Run after the same Release benchmark build:
+
+```sh
+python tools/benchmark_many_small.py build/iw_many_small_benchmark \
+  --cache build/CMakeCache.txt --output benchmark-many-small --repeats 5
+```
+
+The matrix uses 10/1,000/10,000 simultaneous registries, each with 1/10/100 mappings, and three implementations (original, forward 2.0, bidirectional 2.0). Five independent processes per case produce 135 processes / 945 observations. Creation/reservation, insertion, hit/miss, update, removal and destruction are measured separately, with printed validated checksums and a fixed randomized access order. 2.0 resolves handles/owners on each call; the original performs category resolution. This complements the pre-resolved single-registry benchmark rather than replacing it. Setup includes the dynamic handle vector in 2.0; destruction follows emptying the registries, so original dynamic-category cleanup costs appear in removal. See the [raw data, variability, exact workload and limitations](measurements/2026-10-15-many-small/README.md). Peak RSS is a process high-water mark including dataset/runtime memory, not exact map bytes.

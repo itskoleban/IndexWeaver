@@ -1,0 +1,32 @@
+{
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "machine": "x86_64",
+  "python": "3.12.14",
+  "repeats": 5,
+  "seed": 12345,
+  "binary_sha256": "62a4627fa11b006b7a1ecbb3a9eca84ce190cc6e4386736afd0ca5521308f8cc",
+  "head": "9cdbe3cd0772d780f7684d1d4b695bb2fc0387eb",
+  "source_sha256": {
+    "benchmarks/many_small.cpp": "313184be4f6bd35c99fdfad291352c027af548f25a72984589a30f1c9b0ec02e",
+    "src/registry.cpp": "7f6484e603e5ca12dcee5f08bf6d4ee4a42d67ed3f2e15cf5b8a5c017ecb95f0",
+    "src/manager.cpp": "b184594b2b8bc6ca0b323ef97bcf7eeb77afb242bf07bc7e76488f1eaa585a97"
+  },
+  "cmake": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++",
+    "CMAKE_CXX_FLAGS:STRING=",
+    "CMAKE_CXX_FLAGS_DEBUG:STRING=-g",
+    "CMAKE_CXX_FLAGS_MINSIZEREL:STRING=-Os -DNDEBUG",
+    "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+    "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG",
+    "CMAKE_CXX_FLAGS-ADVANCED:INTERNAL=1",
+    "CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL=1",
+    "CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1",
+    "CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL=1",
+    "CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1"
+  ],
+  "compiler": {
+    "CMAKE_CXX_COMPILER_ID": "GNU",
+    "CMAKE_CXX_COMPILER_VERSION": "13.3.0"
+  }
+}

@@ -38,7 +38,7 @@ Documentation covers all implemented natives, error numbers, ownership, memory r
 
 - GCC 13.3.0 x64 Release CMake build, strict project warnings: passed.
 - CTest Release: core, million-mapping stress and actual native bridge with mock AMX: 3/3 passed.
-- Core randomized comparison: 100,000 operations per direction/mode, deterministic reference model and invariant checks; passed.
+- Core randomized comparison: initially 100,000 operations per direction/mode; the follow-up uses 110,000 across small/medium key spaces. Deterministic reference model and invariant checks passed for both distributions.
 - Allocation injection: failures across node allocation and rehash boundaries, insertion/reassignment/reservation/release; invariant and final resource-byte balance checks passed.
 - Lifecycle: repeated ownership initialization/cleanup, 10,000 creation/destruction cycles and 1,000 simultaneously populated registries; passed.
 - GCC x64 Debug ASan+UBSan: 3/3 suites passed with local leak detection disabled **only because default LeakSanitizer failed process introspection under this host's /proc restrictions**. The initial LSan attempt failed with its own fatal diagnostic. No local LSan pass is claimed; CI retains full default sanitizer/leak checking.
@@ -62,6 +62,10 @@ The standard container choice is provisional for maintainer review: correctness 
 
 The first PR CI run confirmed Linux x86 Debug/Release, Pawn compilation, and the full default ASan/UBSan/LeakSanitizer job. Windows Release correctly rejected the initial test's assumption that releasing an empty map leaves zero allocated bytes (`test_core.cpp:57`). The portability correction below addresses both that invalid assumption and the associated clear/release exception-safety issue; current-head CI must be checked separately. Historical failed runs are retained, not described as passing.
 
+## CI test cost
+
+The initial checked-STL Windows Debug run took substantially longer than Release. The randomized tests now separately cover 65-key/100,000-operation and 401-key/10,000-operation sequences per mode, retaining a full invariant check after every operation and increasing the total from 200,000 to 220,000. Core and million-mapping stress remain separate cases. Verbose CI test output includes phase markers so future stalls/failures are diagnosable; no failing assertion or sanitizer was disabled.
+
 ## Final portability audit
 
 Windows Release on the corrected head passed all three suites and produced the checked archive. Full sanitizers including LeakSanitizer also passed in CI.
@@ -74,14 +78,14 @@ Review identified that MSVC's standard unordered_map may allocate for an empty m
 - Native Windows server runtime is not tested locally. Windows x86 build and test evidence comes from CI; Linux x86 runtime evidence is currently emulated locally and repeated natively in CI.
 - Review all new CI results before approval. Do not infer green status from local results. Release workflow is implemented but has not been exercised with a release tag; no tag, merge or release publication is authorized by this change.
 - Full local LeakSanitizer validation remains blocked by host introspection restrictions; The initial PR CI supplied full leak-check evidence for its head; subsequent CI must retain that check.
-- Exact cross-container allocation accounting, sustained multi-million mixed churn profiling, many-small-registry performance distributions, adversarial collision studies and Windows runtime reload coverage are not completed. Existing million-scale stress/randomized churn tests are correctness evidence, not a full server soak.
+- Exact cross-container allocation accounting, multi-hour real-server soak profiling, adversarial collision studies and Windows runtime reload coverage are not completed. A ten-million-operation modeled churn test and many-small-registry measurements are now implemented and executed as described below. Existing million-scale stress/randomized churn tests are correctness evidence, not a full server soak.
 - Allocation-failure injection covers Registry PMR allocations and the manager/native scenarios described below; it does not enumerate every possible state or runtime allocator implementation.
 - The handle exhaustion boundary is checked in code; issuing 2.1 billion handles was not stress-tested. Component binary hot replacement while AMXs hold native pointers is unsupported.
 - Final maintainer assessment must accept or revise the documented container trade-off before describing the component as production-ready.
 
 ## Continuation instructions
 
-Use the existing `codex/indexweaver-2` branch and its pull request. Retrieve current heads, PR reviews and CI before editing. Preserve the tested engine/API and baseline evidence. Resolve any failing CI job first, then address reviewer requests and performance acceptance. Add native Windows runtime/soak evidence and exhaustive manager allocation injection if required. After these gates, perform final audit and seek explicit authorization for a tag/release; do not merge or publish automatically.
+Use the existing `codex/indexweaver-2` branch and its pull request. Retrieve current heads, PR reviews and CI before editing. Preserve the tested engine/API and baseline evidence. Resolve any failing CI job first, then address reviewer requests and performance acceptance. Resolve current CI feedback, add native Windows runtime/soak evidence, and extend allocation injection if uncovered manager states require it. After these gates, perform final audit and seek explicit authorization for a tag/release; do not merge or publish automatically.
 
 ## Follow-up allocation audit, 2026-10-15
 
@@ -90,3 +94,11 @@ Resumed from `3d0e949` on the existing development branch / PR #1. No submitted 
 Added an isolated CTest executable with replacement global scalar/array/aligned allocation functions. For each scenario, a fresh initial state is reconstructed and each allocation boundary is failed in turn until a complete operation succeeds. Verified new/repeated script loading, forward/reverse creation with/without reservation, legacy creation/insertion and actual native Create/Set/legacy Set/clear-release failure translation. Checks require unchanged associations, no published/consumed failed-creation handle, owner isolation, retry success, balanced allocation/deallocation counts and allocation-free unload/reset/shutdown. Repeated owner-load failure intentionally leaves that owner unloaded; the old ownership lifetime cannot be restored and other owners survive.
 
 GCC 13.3 x64 Release: 4/4 suites passed, including million-scale stress. Debug ASan/UBSan: 4/4 passed with the previously documented local leak-introspection workaround; no new local LSan success is claimed. Linux x86 built and the new allocation executable passed under QEMU 8.2.2. On libstdc++, the scenarios traverse 33 injected failures in total; clear-with-release performs no allocations there, so its injected-failure path remains for MSVC CI. This is practical boundary coverage, not proof over all possible manager states, handle-table growth sizes or runtimes. The test is included automatically in the existing Windows/Linux Debug/Release and sanitizer jobs. Production source/API are unchanged by this follow-up.
+
+## Follow-up mixed churn and many-registry measurements
+
+Added a separate always-active CTest case with ten million mixed operations (five million per mode), 32,768 sparse signed keys, reference arrays for forward/reverse ownership, duplicate/occupied-index checks, missing lookups, periodic complete validation, and alternating clear retention/release. PMR allocations balance after destruction. GCC x64 Release and Debug ASan/UBSan passed all five suites; Linux x86 passed the new churn test under QEMU. These are fixed-workload modeled tests, not a multi-hour real-server soak.
+
+The checked-STL core reference tests now use 220,000 operations across small/medium key spaces, with complete invariants after each operation and phase markers in verbose CI. The original 100,000-operation/401-key-per-mode tests passed earlier; the updated distribution bounds checked-STL work while retaining larger-domain coverage. CI compiles both benchmark executables on Windows/Linux as well as running the five correctness suites.
+
+Added management-inclusive many-small-registry benchmarks: 10/1,000/10,000 registries of 1/10/100 mappings for original, forward 2.0 and reverse 2.0, five fresh processes per case (135 processes / 945 observations). Raw data, medians/ranges/deviations, source/binary hashes and build metadata are in [the measurement report](measurements/2026-10-15-many-small/README.md). At 1,000 registries of ten mappings, forward 2.0 median hits were 30.14 ns versus 11.56 ns original, insertion 77.95 ns versus 26.77 ns, and setup/reservation per registry 192.90 ns versus 182.32 ns. The 2.0 measurement includes handle/owner resolution on every access and retains a handle vector; this is not an isolated container comparison. Reverse insertion was 138.99 ns and update 131.19 ns in that case. Shared-host variation and all observed ranges are retained; no universal speed improvement or production latency guarantee follows. Production source/API remain unchanged.
