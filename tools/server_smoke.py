@@ -12,7 +12,9 @@ a=p.parse_args();root=Path(__file__).resolve().parents[1]
 a.log.parent.mkdir(parents=True,exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='iw-smoke-',dir=a.temp_parent) as directory:
     server=Path(directory)/'Server';shutil.copytree(a.server,server)
-    shutil.copy2(a.component,server/'components/IndexWeaver.so')
+    extension=a.component.suffix.lower()
+    if extension not in ('.so','.dll'): raise SystemExit('Expected .so or .dll component')
+    shutil.copy2(a.component,server/f'components/IndexWeaver{extension}')
     (server/'scriptfiles/iw-integration-state.txt').unlink(missing_ok=True)
     for source,destination,defines in [
         (root/'tests/integration.pwn',server/'gamemodes/integration', ['IW_INTEGRATION_AUTORUN=1']),
@@ -25,7 +27,8 @@ with tempfile.TemporaryDirectory(prefix='iw-smoke-',dir=a.temp_parent) as direct
     config['network']['bind']='127.0.0.1';config['network']['port']=17779
     config['rcon']['enable']=False;config['pawn']['main_scripts']=['integration 1'];config['pawn']['side_scripts']=[]
     (server/'config.json').write_text(json.dumps(config,indent=2)+'\n')
-    command=a.runner+[str(server/'omp-server')]
+    binary='omp-server.exe' if extension=='.dll' else 'omp-server'
+    command=a.runner+[str(server/binary)]
     timed_out=False
     with a.log.open('w') as log:
         try: result=subprocess.run(command,cwd=server,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,timeout=90)

@@ -3,6 +3,7 @@
 #include <exception>
 #include <stdexcept>
 namespace index_weaver {
+static_assert(sizeof(cell)==sizeof(Value), "IndexWeaver requires 32-bit Pawn cells");
 namespace {
 Manager* manager = nullptr; // Non-owning binding, valid only while the component is loaded.
 enum class Op { Create, Destroy, Set, Insert, Index, ID, Has, Remove, Clear, Reserve, Count, Stats, Error,

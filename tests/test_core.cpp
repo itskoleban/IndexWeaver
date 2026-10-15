@@ -116,7 +116,10 @@ void stress() {
     CHECK(r.size()==0); CHECK(r.invariant());
 }
 int main(int argc, char**) {
-    functional(); allocation(); lifecycle(); randomized(false); randomized(true);
-    if(argc>1) stress();
-    std::cout << "PASS: functional, allocation rollback, lifecycle, randomized" << (argc>1?", million mappings":"") << '\n';
+    if(argc>1) {
+        stress(); std::cout << "PASS: million sparse bidirectional mappings\n";
+    } else {
+        functional(); allocation(); lifecycle(); randomized(false); randomized(true);
+        std::cout << "PASS: functional, allocation rollback, lifecycle, randomized\n";
+    }
 }

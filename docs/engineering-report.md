@@ -12,7 +12,7 @@ All original project source/header/include/tests/CMake/workflow/README and pinne
 | --- | --- |
 | Include/README version 1.1.0 versus CMake/component 1.0.0 | Authoritative VERSION, generated C++ header, checked Pawn include |
 | Required operations inside `assert` | Explicit runtime checks active in Release/NDEBUG |
-| CI compiles without tests | Debug/Release x86 build+CTest matrix, sanitizers, Pawn compile and real server smoke |
+| CI compiles without tests | Debug/Release x86 build+CTest matrix, sanitizers, Pawn compile and Linux/Windows real server smoke |
 | Fixed 64 maps plus different retention policies above/below category 64 | Dynamic owned registries; explicit clear/release/destroy |
 | Duplicate indices allowed, no reverse-map policy | Documented forward aliases; optional unique reverse mapping; insert versus upsert |
 | AMX unload ignored; global category state shared across scripts | Per-AMX ownership and unload cleanup, reset invalidation |
@@ -64,12 +64,14 @@ The first PR CI run confirmed Linux x86 Debug/Release, Pawn compilation, and the
 
 ## Final portability audit
 
+Windows Release on the corrected head passed all three suites and produced the checked archive. Full sanitizers including LeakSanitizer also passed in CI.
+
 Review identified that MSVC's standard unordered_map may allocate for an empty map, unlike the tested libstdc++ implementation. Clear-with-release therefore constructs both replacements before either swap and propagates allocation failure through the native guard; it is not incorrectly marked noexcept. Tests compare post-release allocation with the implementation's empty-registry baseline, then require zero bytes after destruction. Core symbols are hidden from the component export table; the validated Linux binary exports only ComponentEntryPoint. Repeated packaging excludes its previous manifest to avoid hashing the manifest itself.
 
 ## Compatibility and remaining release gates
 
 - 2.0 is breaking: script-private compatibility categories, removed debug-level natives, explicit lifecycle and reverse uniqueness rules. Existing signed-ID/nonnegative-index semantics remain. See [migration](migration.md).
-- Native Windows server runtime is not tested locally. Windows x86 build and test evidence must come from CI; Linux x86 runtime evidence is currently emulated locally and repeated natively in CI.
+- Native Windows server runtime is not tested locally. Windows x86 build and test evidence comes from CI; Linux x86 runtime evidence is currently emulated locally and repeated natively in CI.
 - Review all new CI results before approval. Do not infer green status from local results. Release workflow is implemented but has not been exercised with a release tag; no tag, merge or release publication is authorized by this change.
 - Full local LeakSanitizer validation remains blocked by host introspection restrictions; The initial PR CI supplied full leak-check evidence for its head; subsequent CI must retain that check.
 - Exact cross-container allocation accounting, sustained multi-million mixed churn profiling, many-small-registry performance distributions, adversarial collision studies and Windows runtime reload coverage are not completed. Existing million-scale stress/randomized churn tests are correctness evidence, not a full server soak.
