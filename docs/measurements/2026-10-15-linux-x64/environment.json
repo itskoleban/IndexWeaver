@@ -1,0 +1,17 @@
+{
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "machine": "x86_64",
+  "python": "3.12.14",
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+  "repeats": 5,
+  "seed": 12345,
+  "binary": "/workspace/scratch/60d13a3ba43a/IndexWeaver/build/iw_benchmark",
+  "note": "Record CMakeCache.txt with results to retain exact compiler/flags. RSS is process peak including dataset, zero=unavailable.",
+  "flags": "-O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wpedantic -Wconversion -Wshadow; no LTO; default allocator for timing",
+  "source_sha256": {
+    "src/registry.cpp": "e489c0476122140285c5bdb33ea22c7c0caf6835bac1dc3eed32d6f808ceb5f5",
+    "src/manager.cpp": "b184594b2b8bc6ca0b323ef97bcf7eeb77afb242bf07bc7e76488f1eaa585a97",
+    "benchmarks/benchmark.cpp": "36f260d1998d54ae1552ccc4bfec85d9c3dce1b61525efdc1d75a7de1b2ae4ac"
+  },
+  "cpu_model": "Not exposed/recorded; shared cloud host, no affinity/frequency control"
+}

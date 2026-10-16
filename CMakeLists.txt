@@ -1,183 +1,114 @@
-cmake_minimum_required(VERSION 3.19...3.28)
-
-project(IndexWeaver
-    LANGUAGES C CXX
-    VERSION 1.0.0
-    DESCRIPTION "Lightweight in-memory index registry plugin for open.mp"
-)
-
-# ==============================================================================
-# Global Configuration
-# ==============================================================================
-include(GNUInstallDirs)
+cmake_minimum_required(VERSION 3.20)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" IW_VERSION LIMIT_COUNT 1)
+project(IndexWeaver VERSION ${IW_VERSION} LANGUAGES C CXX)
 include(CTest)
-include(CheckIPOSupported)
-
-# Export compile commands for tooling (clangd, intellisense)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Default to Release build if not specified
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+option(IW_BUILD_COMPONENT "Build x86 open.mp component (requires submodules)" OFF)
+option(IW_BUILD_NATIVE_TESTS "Build native boundary tests (requires compiler submodule)" OFF)
+option(IW_BUILD_BENCHMARKS "Build separate benchmarks (requires SDK robin hood submodule)" OFF)
+option(IW_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+if(IW_SANITIZERS AND (MSVC OR NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$"))
+    message(FATAL_ERROR "IW_SANITIZERS requires a GCC/Clang driver supporting both AddressSanitizer and UndefinedBehaviorSanitizer")
 endif()
-
-# Modern C++ standards
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# ==============================================================================
-# Main Target: IndexWeaver Plugin
-# ==============================================================================
-add_library(IndexWeaver SHARED
-    src/main.cpp
-    src/mapper_store.cpp
-    src/natives.cpp
-)
-
-# Create an alias for modern namespace consumption (e.g., add_subdirectory integration)
-add_library(IndexWeaver::IndexWeaver ALIAS IndexWeaver)
-
-# Output configuration tailored for open.mp plugins
-set_target_properties(IndexWeaver PROPERTIES
-    OUTPUT_NAME "IndexWeaver"
-    PREFIX "" # Plugins are not prefixed with 'lib' in open.mp
-    C_VISIBILITY_PRESET hidden
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON
-)
-
-# ==============================================================================
-# Dependencies & Includes
-# ==============================================================================
-target_include_directories(IndexWeaver PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-)
-
-# Mark third-party libraries as SYSTEM to suppress their compiler warnings
-target_include_directories(IndexWeaver SYSTEM PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/glm>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/span-lite/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/string-view-lite/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/compiler/source>
-)
-
-if(NOT WIN32)
+function(iw_settings target)
+    target_compile_features(${target} PUBLIC cxx_std_20)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive- /Zc:__cplusplus)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+        if(IW_SANITIZERS)
+            target_compile_options(${target} PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+            target_link_options(${target} PUBLIC -fsanitize=address,undefined)
+        endif()
+    endif()
+endfunction()
+add_library(iw_core STATIC src/registry.cpp src/manager.cpp)
+target_include_directories(iw_core PUBLIC src)
+set_target_properties(iw_core PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+iw_settings(iw_core)
+configure_file(cmake/version.hpp.in generated/version.hpp @ONLY)
+if(BUILD_TESTING)
+    add_executable(iw_tests tests/test_core.cpp)
+    target_link_libraries(iw_tests PRIVATE iw_core)
+    iw_settings(iw_tests)
+    add_test(NAME core COMMAND iw_tests)
+    add_test(NAME stress COMMAND iw_tests stress)
+    add_test(NAME sustained_churn COMMAND iw_tests churn)
+    set_tests_properties(stress sustained_churn PROPERTIES LABELS stress)
+    # Isolate replacement global allocation functions from other test executables.
+    add_executable(iw_allocation_tests tests/test_allocation.cpp)
+    target_link_libraries(iw_allocation_tests PRIVATE iw_core)
+    iw_settings(iw_allocation_tests)
+    add_test(NAME manager_allocation COMMAND iw_allocation_tests)
+    set_tests_properties(core stress sustained_churn manager_allocation PROPERTIES TIMEOUT 180)
+    # Opt-in reproducer for allocator failures in the platform standard library.
+    # Kept separate from CTest; it does not replace or waive allocation tests.
+    add_executable(iw_stl_allocation_probe EXCLUDE_FROM_ALL tests/stl_allocation_probe.cpp)
+    iw_settings(iw_stl_allocation_probe)
+    if(IW_BUILD_NATIVE_TESTS)
+        add_executable(iw_native_tests tests/test_natives.cpp src/natives.cpp)
+        target_link_libraries(iw_native_tests PRIVATE iw_core)
+        target_include_directories(iw_native_tests SYSTEM PRIVATE lib/compiler/source)
+        if(NOT WIN32)
+            target_include_directories(iw_native_tests SYSTEM PRIVATE lib/compiler/source/linux)
+        endif()
+        target_compile_definitions(iw_native_tests PRIVATE PAWN_CELL_SIZE=32 HAVE_STDINT_H=1)
+        iw_settings(iw_native_tests)
+        add_test(NAME native_boundary COMMAND iw_native_tests)
+        set_tests_properties(native_boundary PROPERTIES TIMEOUT 180)
+        target_sources(iw_allocation_tests PRIVATE src/natives.cpp)
+        target_include_directories(iw_allocation_tests SYSTEM PRIVATE lib/compiler/source)
+        if(NOT WIN32)
+            target_include_directories(iw_allocation_tests SYSTEM PRIVATE lib/compiler/source/linux)
+        endif()
+        target_compile_definitions(iw_allocation_tests PRIVATE IW_TEST_NATIVE_ALLOCATION=1 PAWN_CELL_SIZE=32 HAVE_STDINT_H=1)
+    endif()
+endif()
+if(IW_BUILD_BENCHMARKS)
+    add_executable(iw_benchmark benchmarks/benchmark.cpp benchmarks/baseline/mapper_store.cpp)
+    target_link_libraries(iw_benchmark PRIVATE iw_core)
+    target_include_directories(iw_benchmark SYSTEM PRIVATE lib/sdk/lib/robin-hood-hashing/src/include)
+    iw_settings(iw_benchmark)
+    add_executable(iw_many_small_benchmark benchmarks/many_small.cpp benchmarks/baseline/mapper_store.cpp)
+    target_link_libraries(iw_many_small_benchmark PRIVATE iw_core)
+    target_include_directories(iw_many_small_benchmark SYSTEM PRIVATE lib/sdk/lib/robin-hood-hashing/src/include)
+    iw_settings(iw_many_small_benchmark)
+endif()
+if(IW_BUILD_COMPONENT)
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+        message(FATAL_ERROR "open.mp component requires x86: use -A Win32 or -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_C_FLAGS=-m32")
+    endif()
+    include(CheckCXXSourceCompiles)
+    check_cxx_source_compiles("#if !defined(__i386__) && !defined(_M_IX86)
+#error x86 required
+#endif
+int main() { return 0; }" IW_TARGET_X86)
+    if(NOT IW_TARGET_X86)
+        message(FATAL_ERROR "The component requires the x86 ISA, not just any 32-bit target")
+    endif()
+    add_library(IndexWeaver SHARED src/main.cpp src/natives.cpp)
+    target_link_libraries(IndexWeaver PRIVATE iw_core)
+    target_include_directories(IndexWeaver PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
     target_include_directories(IndexWeaver SYSTEM PRIVATE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/compiler/source/linux>
-    )
-endif()
-
-target_compile_definitions(IndexWeaver PRIVATE
-    HAVE_STDINT_H=1
-    HAVE_ALLOCA_H=0
-    PAWN_CELL_SIZE=32
-    GLM_FORCE_QUAT_DATA_WXYZ
-    NOMINMAX
-    nssv_CONFIG_SELECT_STRING_VIEW=nssv_STRING_VIEW_NONSTD
-    span_CONFIG_SELECT_SPAN=span_SPAN_NONSTD
-)
-
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    target_compile_definitions(IndexWeaver PRIVATE GLM_FORCE_SSE2)
-else()
-    target_compile_definitions(IndexWeaver PRIVATE GLM_FORCE_NEON)
-endif()
-
-# ==============================================================================
-# Compiler Flags & Diagnostics
-# ==============================================================================
-if(MSVC)
-    target_compile_options(IndexWeaver PRIVATE 
-        /W4 
-        /permissive- 
-        /Zc:__cplusplus # Correctly report __cplusplus macro
-    )
-    # Statically link runtime to avoid missing VCRUNTIME DLLs on host servers
-    set_property(TARGET IndexWeaver PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-else()
-    target_compile_options(IndexWeaver PRIVATE 
-        -Wall 
-        -Wextra 
-        -Wpedantic 
-        -Wshadow      # Warn if local variable shadows another
-        -Wconversion  # Warn on implicit conversions that may alter a value
-    )
-endif()
-
-# ==============================================================================
-# Linker & Optimizations
-# ==============================================================================
-check_ipo_supported(RESULT ipo_supported OUTPUT ipo_output)
-if(ipo_supported)
-    set_target_properties(IndexWeaver PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
-
-if(MINGW)
-    target_link_options(IndexWeaver PRIVATE
-        "-static-libgcc"
-        "-static-libstdc++"
-        "-Wl,-Bstatic" "-lwinpthread" "-Wl,-Bdynamic"
-    )
-endif()
-
-# ==============================================================================
-# Testing & Benchmarking
-# ==============================================================================
-option(INDEX_WEAVER_BUILD_TESTS "Build IndexWeaver tests and benchmarks" OFF)
-
-if(BUILD_TESTING AND INDEX_WEAVER_BUILD_TESTS)
-    # 1. Unit Tests
-    add_executable(IndexWeaverTests 
-        tests/test_store.cpp 
-        src/mapper_store.cpp
-    )
-
-    target_include_directories(IndexWeaverTests PRIVATE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    )
-    target_include_directories(IndexWeaverTests SYSTEM PRIVATE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include>
-    )
-
-    if(MSVC)
-        set_property(TARGET IndexWeaverTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        lib/sdk/include lib/sdk/lib/glm lib/sdk/lib/robin-hood-hashing/src/include
+        lib/sdk/lib/span-lite/include lib/sdk/lib/string-view-lite/include lib/compiler/source)
+    if(NOT WIN32)
+        target_include_directories(IndexWeaver SYSTEM PRIVATE lib/compiler/source/linux)
     endif()
-
-    add_test(NAME UnitTests COMMAND IndexWeaverTests)
-
-    # 2. Stress Test / Benchmark
-    add_executable(IndexWeaverStress 
-        tests/test_stress.cpp 
-        src/mapper_store.cpp
-    )
-
-    target_include_directories(IndexWeaverStress PRIVATE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    )
-    target_include_directories(IndexWeaverStress SYSTEM PRIVATE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/sdk/lib/robin-hood-hashing/src/include>
-    )
-
+    target_compile_definitions(IndexWeaver PRIVATE PAWN_CELL_SIZE=32 HAVE_STDINT_H=1
+        GLM_FORCE_QUAT_DATA_WXYZ NOMINMAX nssv_CONFIG_SELECT_STRING_VIEW=nssv_STRING_VIEW_NONSTD
+        span_CONFIG_SELECT_SPAN=span_SPAN_NONSTD GLM_FORCE_SSE2)
     if(MSVC)
-        set_property(TARGET IndexWeaverStress PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-        # Force aggressive optimization for the benchmark target even if built under Debug mode logic
-        target_compile_options(IndexWeaverStress PRIVATE /O2)
+        target_compile_options(IndexWeaver PRIVATE /fp:strict /arch:SSE2)
+    else()
+        target_compile_options(IndexWeaver PRIVATE -msse2 -mfpmath=sse)
     endif()
+    set_target_properties(IndexWeaver PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
+    iw_settings(IndexWeaver)
+    install(TARGETS IndexWeaver RUNTIME DESTINATION components LIBRARY DESTINATION components)
 endif()
-
-# ==============================================================================
-# Installation Rules
-# ==============================================================================
-install(TARGETS IndexWeaver
-    RUNTIME DESTINATION components
-    LIBRARY DESTINATION components
-    ARCHIVE DESTINATION components
-)
-
 install(FILES include/indexweaver.inc DESTINATION include)
-install(FILES README.md LICENSE DESTINATION .)
+install(FILES README.md LICENSE VERSION DESTINATION .)
+install(DIRECTORY docs examples DESTINATION .)
+
+install(FILES tests/integration.pwn tests/ownership.pwn tests/survivor.pwn tests/example_safety.pwn DESTINATION tests)

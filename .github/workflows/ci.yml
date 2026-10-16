@@ -1,0 +1,153 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  component:
+    timeout-minutes: 20
+    name: ${{ matrix.platform }} / ${{ matrix.config }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux-x86, config: Release, args: '-DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_BUILD_TYPE=Release'}
+          - {os: ubuntu-24.04, platform: linux-x86, config: Debug, args: '-DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_BUILD_TYPE=Debug'}
+          - {os: windows-2022, platform: windows-x86, config: Release, args: '-A Win32'}
+          - {os: windows-2022, platform: windows-x86, config: Debug, args: '-A Win32'}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: recursive
+      - name: Linux x86 toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++-multilib
+      - run: python tools/check_version.py
+      - run: cmake -S . -B build -DIW_BUILD_COMPONENT=ON -DIW_BUILD_NATIVE_TESTS=ON -DIW_BUILD_BENCHMARKS=ON ${{ matrix.args }}
+      - run: cmake --build build --config ${{ matrix.config }} --parallel 2
+      - name: Locate installed x86 Debug CRT
+        if: runner.os == 'Windows' && matrix.config == 'Debug'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -property installationPath
+          $crt = Get-ChildItem "$vs/VC/Redist/MSVC" -Recurse -Filter msvcp140d.dll | Where-Object { $_.FullName -match '\\x86\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$crt) { throw 'Installed x86 MSVC Debug CRT not found' }
+          $crt.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Append
+          $ucrt = Get-ChildItem "${env:ProgramFiles(x86)}/Windows Kits/10/bin" -Recurse -Filter ucrtbased.dll | Where-Object { $_.FullName -match '\\x86\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (!$ucrt) { throw 'Installed x86 Debug UCRT not found' }
+          $ucrt.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Append
+          Write-Output "Debug CRT: $($crt.DirectoryName)"
+          Write-Output "Debug UCRT: $($ucrt.DirectoryName)"
+      - name: Verify Debug test process can start
+        if: runner.os == 'Windows' && matrix.config == 'Debug'
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path build/Debug/iw_tests.exe).Path
+          $process = Start-Process -FilePath $exe -ArgumentList '--invalid-launch-probe' -PassThru -NoNewWindow
+          if (!$process.WaitForExit(15000)) { $process.Kill($true); throw 'Debug test executable did not start/exit within 15 seconds' }
+          $process.Refresh()
+          if ($process.ExitCode -ne 2) { throw "Debug test launch returned $($process.ExitCode), expected its invalid-argument exit code 2" }
+          Write-Output 'Debug test process launch verified; executing the complete suite next'
+      - run: ctest --test-dir build -C ${{ matrix.config }} --verbose --output-on-failure --no-tests=error
+      - name: Install verified payload
+        if: matrix.config == 'Release'
+        run: cmake --install build --config Release --prefix stage
+      - name: Package
+        if: matrix.config == 'Release'
+        run: python tools/package.py stage ${{ matrix.platform }}
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: matrix.config == 'Release'
+        with:
+          name: ${{ matrix.platform }}
+          path: out/*
+          if-no-files-found: error
+  sanitizers:
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: recursive
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DIW_SANITIZERS=ON -DIW_BUILD_NATIVE_TESTS=ON
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --verbose --output-on-failure --no-tests=error
+  pawn:
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: recursive
+      - run: cmake -S lib/compiler/source/compiler -B build-pawn -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS=-DPAWN_CELL_SIZE=32 -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build-pawn --target pawncc --parallel 2
+      - run: python tools/check_pawn.py build-pawn/pawncc
+  integration:
+    timeout-minutes: 10
+    name: Real open.mp ${{ matrix.platform }} lifecycle
+    needs: component
+    # A Debug failure must remain a failed gate, but must not suppress runtime
+    # evidence from the independently tested Release artifacts.
+    if: ${{ always() && !cancelled() }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux-x86}
+          - {os: windows-2022, platform: windows-x86}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: ${{ matrix.platform }}
+          path: artifacts
+      - name: Linux runtime and compiler prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++-multilib
+      - name: Retrieve pinned Linux server distribution
+        if: runner.os == 'Linux'
+        run: |
+          curl --fail --location --retry 3 https://github.com/openmultiplayer/open.mp/releases/download/v1.6.7.3218/open.mp-linux-x86.tar.gz -o server.tar.gz
+          echo '0f7bfe70bb68ea780fe24a910b69412046e53d10feb65a9d4a9de8ff1f7f1329  server.tar.gz' | sha256sum --check
+          mkdir server
+          tar -xzf server.tar.gz -C server
+          mkdir package
+          cd artifacts
+          sha256sum --check *.sha256
+          unzip '*.zip' -d ../package
+      - name: Retrieve pinned Windows server distribution
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/openmultiplayer/open.mp/releases/download/v1.6.7.3218/open.mp-win-x86.zip -OutFile server.zip
+          if ((Get-FileHash server.zip -Algorithm SHA256).Hash.ToLower() -ne 'db44b6cedc78e79fa4c7470ec81186ad9e880ad34529ae78fddfea70ec603223') { throw 'Server archive SHA256 mismatch' }
+          Expand-Archive server.zip server
+          $asset = Get-ChildItem artifacts/*.zip
+          if ($asset.Count -ne 1) { throw 'Expected one tested component archive' }
+          $expected = (Get-Content ($asset.FullName + '.sha256')).Split(' ')[0]
+          if ((Get-FileHash $asset.FullName -Algorithm SHA256).Hash.ToLower() -ne $expected) { throw 'Component archive SHA256 mismatch' }
+          Expand-Archive $asset.FullName package
+      - name: Build pinned Pawn compiler on Linux
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S lib/compiler/source/compiler -B build-pawn -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS=-DPAWN_CELL_SIZE=32 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-pawn --target pawncc --parallel 2
+      - name: Exercise Linux server
+        if: runner.os == 'Linux'
+        run: python tools/server_smoke.py --server server/Server --component package/components/IndexWeaver.so --compiler build-pawn/pawncc --log integration-result.txt
+      - name: Exercise Windows server with its shipped Pawn compiler
+        if: runner.os == 'Windows'
+        run: python tools/server_smoke.py --server server/Server --component package/components/IndexWeaver.dll --compiler server/Server/qawno/pawncc.exe --log integration-result.txt
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: integration-evidence-${{ matrix.platform }}-logs
+          path: integration-result.txt
+          if-no-files-found: warn
