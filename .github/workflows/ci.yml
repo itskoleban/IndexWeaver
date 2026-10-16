@@ -90,6 +90,9 @@ jobs:
     timeout-minutes: 10
     name: Real open.mp ${{ matrix.platform }} lifecycle
     needs: component
+    # A Debug failure must remain a failed gate, but must not suppress runtime
+    # evidence from the independently tested Release artifacts.
+    if: ${{ always() && !cancelled() }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

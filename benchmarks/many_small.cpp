@@ -29,6 +29,7 @@ struct ModernMany {
         if (registry(category).set(key, index) != Error::None) throw std::runtime_error("set");
     }
     int get(int category, int key) { return registry(category).index(key).value_or(-1); }
+    int getID(int category, int index) { return registry(category).id(index).value_or(-1); }
     void remove(int category, int key) { if (!registry(category).remove(key)) throw std::runtime_error("remove"); }
 };
 struct OriginalMany {
@@ -74,6 +75,17 @@ template<class Store> void run(const std::string& name, int registries, int size
     auto misses = measure([&] { for (std::size_t k = 0; k < rounds; ++k) for (auto [i, j] : workload) sum += store->get(i, -j * 1009 - 1); }, count * rounds);
     if (sum != -static_cast<std::int64_t>(count * rounds)) throw std::runtime_error("miss checksum");
     record("miss", misses, sum);
+    if constexpr(requires { store->getID(0, 0); }) {
+        if (name == "v2reverse") {
+            sum = 0;
+            auto reverseHits = measure([&] { for (std::size_t k = 0; k < rounds; ++k) for (auto [i, j] : workload) sum += store->getID(i, j); }, count * rounds);
+            if (sum != expected * 1009) throw std::runtime_error("reverse hit checksum");
+            record("reverse_hit", reverseHits, sum); sum = 0;
+            auto reverseMisses = measure([&] { for (std::size_t k = 0; k < rounds; ++k) for (auto [i, j] : workload) sum += store->getID(i, j + size); }, count * rounds);
+            if (sum != -static_cast<std::int64_t>(count * rounds)) throw std::runtime_error("reverse miss checksum");
+            record("reverse_miss", reverseMisses, sum);
+        }
+    }
     record("update", measure([&] { for (auto [i, j] : workload) store->set(i, j * 1009, j + size); }, count));
     sum = 0;
     for (auto [i, j] : workload) sum += store->get(i, j * 1009);

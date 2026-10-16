@@ -41,6 +41,7 @@ native bool:SetMapIndex(registry_type, id, index);
 native GetMapIndex(registry_type, id);
 native bool:RemoveMapIndex(registry_type, id);
 native bool:HasMapIndex(registry_type, id);
+// Destroy an existing category and release its storage, even when it is empty.
 native bool:ClearMapRegistry(registry_type);
 native ClearAllMapRegistries();
 native bool:ReserveMapRegistry(registry_type, capacity);

@@ -1,4 +1,5 @@
 #include "natives.hpp"
+#include "diagnostics.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -17,6 +18,7 @@ cell call(AMX& amx, const char* name, std::initializer_list<cell> args) {
     return functions.at(name)(&amx,p.data());
 }
 int main() {
+    configureTestDiagnostics();
     Manager m; AMX a{}, b{}; cell data[32]{};
     a.data=reinterpret_cast<unsigned char*>(data); a.hea=64; a.stk=96; a.stp=128;
     b=a; m.load(&a); m.load(&b); bindNatives(&m); CHECK(registerNatives(&a)==0); CHECK(functions.size()==22);
@@ -53,6 +55,18 @@ int main() {
     CHECK(call(a,"ReserveMapRegistry",{77,0})==0); CHECK(call(a,"ReserveMapRegistry",{77,10000001})==0);
     CHECK(call(a,"ReserveMapRegistry",{77,100})==1); CHECK(call(a,"ClearMapRegistry",{77})==1);
     CHECK(call(a,"ClearMapRegistry",{77})==0); CHECK(call(a,"ClearAllMapRegistries",{})==1);
+    // A reserved or emptied category must still be individually releasable.
+    CHECK(call(a,"ReserveMapRegistry",{78,1000})==1);
+    CHECK(call(a,"CountAllMapRegistries",{})==0);
+    CHECK(call(a,"ClearMapRegistry",{78})==1);
+    CHECK(call(a,"Registry_GetLastError",{})==static_cast<cell>(Error::None));
+    CHECK(call(a,"ClearMapRegistry",{78})==0);
+    CHECK(call(a,"Registry_GetLastError",{})==static_cast<cell>(Error::Missing));
+    CHECK(call(a,"SetMapIndex",{78,9,2})==1);
+    CHECK(call(a,"RemoveMapIndex",{78,9})==1);
+    CHECK(call(a,"ClearMapRegistry",{78})==1);
+    CHECK(call(a,"ClearMapRegistry",{-1})==0);
+    CHECK(call(a,"Registry_GetLastError",{})==static_cast<cell>(Error::InvalidArgument));
     m.reset(); CHECK(call(a,"Registry_Count",{f})==0); CHECK(call(a,"Registry_GetLastError",{})==static_cast<cell>(Error::InvalidHandle));
     m.unload(&a); CHECK(call(a,"Registry_Create",{0,0})==0); m.load(&a);
     CHECK(call(a,"Registry_Create",{0,0})>f); bindNatives(nullptr);

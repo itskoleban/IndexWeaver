@@ -18,14 +18,16 @@ with tempfile.TemporaryDirectory(prefix='iw-smoke-',dir=a.temp_parent) as direct
     (server/'scriptfiles/iw-integration-state.txt').unlink(missing_ok=True)
     for source,destination,defines in [
         (root/'tests/integration.pwn',server/'gamemodes/integration', ['IW_INTEGRATION_AUTORUN=1']),
-        (root/'tests/ownership.pwn',server/'filterscripts/ownership', [])]:
+        (root/'tests/ownership.pwn',server/'filterscripts/ownership', []),
+        (root/'tests/survivor.pwn',server/'filterscripts/survivor', []),
+        (root/'tests/example_safety.pwn',server/'filterscripts/example_safety', [])]:
         args=[str(a.compiler.resolve()),str(source),f'-i{root/"include"}',f'-i{root/"lib/omp-stdlib"}',f'-o{destination}','-;+','-(+']+defines
         result=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
         if result.returncode or 'warning ' in result.stdout.lower(): raise SystemExit(result.stdout)
     config=json.loads((server/'config.json').read_text())
     config['announce']=False;config['enable_query']=False;config['artwork']['enable']=False
     config['network']['bind']='127.0.0.1';config['network']['port']=17779
-    config['rcon']['enable']=False;config['pawn']['main_scripts']=['integration 1'];config['pawn']['side_scripts']=[]
+    config['rcon']['enable']=False;config['pawn']['main_scripts']=['integration 1'];config['pawn']['side_scripts']=['filterscripts/survivor']
     (server/'config.json').write_text(json.dumps(config,indent=2)+'\n')
     binary='omp-server.exe' if extension=='.dll' else 'omp-server'
     command=a.runner+[str(server/binary)]
@@ -35,7 +37,9 @@ with tempfile.TemporaryDirectory(prefix='iw-smoke-',dir=a.temp_parent) as direct
         except subprocess.TimeoutExpired: timed_out=True
     output=a.log.read_text(errors='replace')
     expected={'INDEXWEAVER_INTEGRATION_PASS':3,'INDEXWEAVER_FILTERSCRIPT_OWNERSHIP_PASS':3,
-              'INDEXWEAVER_FILTERSCRIPT_UNLOAD_PASS':3,'INDEXWEAVER_GMX_HANDLE_PASS':2,'INDEXWEAVER_LIFECYCLE_PASS':1}
+              'INDEXWEAVER_FILTERSCRIPT_UNLOAD_PASS':3,'INDEXWEAVER_GMX_HANDLE_PASS':2,'INDEXWEAVER_LIFECYCLE_PASS':1,
+              'INDEXWEAVER_SURVIVOR_READY_PASS':3,'INDEXWEAVER_SURVIVOR_RESET_PASS':2,
+              'INDEXWEAVER_SURVIVOR_SHUTDOWN_PASS':1,'INDEXWEAVER_EXAMPLE_SAFETY_PASS':3}
     if timed_out or result.returncode or '_FAIL' in output or any(output.count(k)!=v for k,v in expected.items()):
         print(output);raise SystemExit('Real server lifecycle smoke failed; inspect saved log')
-    print('PASS: real open.mp, 3 gamemode loads, 2 GMX cycles, 3 filterscript load/unloads, ownership and clean shutdown')
+    print('PASS: real open.mp, 3 gamemode loads, 2 GMX cycles with a surviving AMX, unload ownership, example failure recovery and clean shutdown')

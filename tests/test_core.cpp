@@ -1,4 +1,5 @@
 #include "manager.hpp"
+#include "diagnostics.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -44,6 +45,7 @@ void functional() {
 }
 void allocation() {
     for (int budget=0; budget<12; ++budget) {
+        std::cout << "[allocation] budget=" << budget << '\n' << std::flush;
         Memory m;
         { Registry b(true,&m); const auto emptyBytes=m.bytes; b.reserve(2); CHECK(b.set(1,1) == Error::None); CHECK(b.set(2,2) == Error::None);
           m.untilFailure=budget;
@@ -185,6 +187,7 @@ void churn(bool bidirectional) {
     CHECK(memory.bytes == 0);
 }
 int main(int argc, char** argv) {
+    configureTestDiagnostics();
     if (argc == 2 && std::string_view(argv[1]) == "churn") {
         churn(false); churn(true);
         std::cout << "PASS: 10 million mixed sparse signed-ID operations, both modes, independent forward/reverse models and balanced PMR allocations\n";

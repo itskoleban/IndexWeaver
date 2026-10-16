@@ -28,6 +28,7 @@ struct Modern {
     void reserve(int n){r.reserve(static_cast<std::size_t>(n));}
     void set(int k,int v){if(r.set(k,v)!=Error::None) throw std::runtime_error("set failed");}
     int get(int k){return r.index(k).value_or(-1);}
+    int getID(int index){return r.id(index).value_or(-1);}
     void remove(int k){if(!r.remove(k)) throw std::runtime_error("remove failed");}
     std::size_t bytes() const{return 0;}
 };
@@ -77,6 +78,17 @@ template<class Store> void run(Store& r,const std::string& name,int n,int repeat
     auto miss=measure([&]{for(int j=0;j<rounds;++j) for(int k:keys) sum+=r.get(-k-1);},keys.size()*static_cast<std::size_t>(rounds));
     if(sum!=-static_cast<std::int64_t>(n)*rounds) throw std::runtime_error("miss checksum");
     record("miss",miss,sum);
+    if constexpr(requires { r.getID(0); }) {
+        if(name=="v2reverse") {
+            sum=0;
+            auto reverseHit=measure([&]{for(int j=0;j<rounds;++j) for(int k:keys) sum+=r.getID(k/1009);},keys.size()*static_cast<std::size_t>(rounds));
+            if(sum!=static_cast<std::int64_t>(n)*(n-1)/2*1009*rounds) throw std::runtime_error("reverse hit checksum");
+            record("reverse_hit",reverseHit,sum); sum=0;
+            auto reverseMiss=measure([&]{for(int j=0;j<rounds;++j) for(int k:keys) sum+=r.getID(n+k/1009);},keys.size()*static_cast<std::size_t>(rounds));
+            if(sum!=-static_cast<std::int64_t>(n)*rounds) throw std::runtime_error("reverse miss checksum");
+            record("reverse_miss",reverseMiss,sum);
+        }
+    }
     // Unique replacement values ensure the exact workload is valid in bidirectional mode.
     record("update",measure([&]{for(int k:keys) r.set(k,k/1009+n);},keys.size()));
     record("remove",measure([&]{for(int k:keys) r.remove(k);},keys.size()));

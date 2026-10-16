@@ -54,7 +54,7 @@ These natives use forward-only `Registry` instances through the same engine. Cat
 | `GetMapIndex(registry_type,id)` | Index or `INVALID_MAP_INDEX` (-1) |
 | `bool:RemoveMapIndex(registry_type,id)` | Remove if found |
 | `bool:HasMapIndex(registry_type,id)` | Check ID |
-| `bool:ClearMapRegistry(registry_type)` | Destroy a nonempty category; false if empty/missing |
+| `bool:ClearMapRegistry(registry_type)` | Destroy any existing category, including empty/reserved; false if missing |
 | `ClearAllMapRegistries()` | Clear only this script's compatibility categories; returns 1 |
 | `bool:ReserveMapRegistry(registry_type,capacity)` | Reserve 1..10,000,000; creates category if absent |
 | `CountMapRegistry(registry_type)` | Association count, 0 if absent |

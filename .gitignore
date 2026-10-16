@@ -63,3 +63,4 @@ compile_commands.json
 Thumbs.db
 build-*/
 __pycache__/
+work/

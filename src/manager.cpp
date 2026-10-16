@@ -57,7 +57,7 @@ Registry* Manager::legacy(Owner owner, Value category, bool create) {
 bool Manager::clearLegacy(Owner owner, Value category) noexcept {
     auto s = scripts_.find(owner); if (s == scripts_.end()) return false;
     auto it = s->second.legacy.find(category);
-    if (it == s->second.legacy.end() || it->second->size() == 0) return false;
+    if (it == s->second.legacy.end()) return false;
     s->second.legacy.erase(it); return true;
 }
 void Manager::clearLegacyAll(Owner owner) noexcept {

@@ -96,8 +96,9 @@ stock bool:RegisterClanRow(database_id, slot)
 stock bool:BeginPropertyReload(expected_rows)
 {
     if (expected_rows < 0 || expected_rows > MAX_PROPERTIES) return false;
-    if (!Registry_Clear(g_Properties)) return false;
-    return Registry_Reserve(g_Properties, expected_rows);
+    // Reserve first: failure must leave the previously loaded mappings intact.
+    if (!Registry_Reserve(g_Properties, expected_rows)) return false;
+    return Registry_Clear(g_Properties);
 }
 public OnGameModeExit()
 {

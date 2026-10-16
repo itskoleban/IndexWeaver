@@ -51,6 +51,14 @@ public OnGameModeInit()
 #if defined IW_INTEGRATION_AUTORUN
 new Registry:g_Survivor;
 new g_Foreign;
+stock IntegrationCycle()
+{
+    if (!fexist("iw-integration-state.txt")) return 0;
+    new File:input = fopen("iw-integration-state.txt", io_read);
+    if (input == File:0) return -1;
+    new line[40]; fread(input, line); fclose(input);
+    return strval(line);
+}
 forward IntegrationStep(step);
 forward IntegrationForeign(handle);
 public IntegrationForeign(handle)
@@ -65,6 +73,9 @@ public IntegrationStep(step)
     {
         case 0:
         {
+            REQUIRE(CallRemoteFunction("SurvivorCheck", "i", IntegrationCycle()) == 1);
+            SendRconCommand("loadfs example_safety");
+            SendRconCommand("unloadfs example_safety");
             g_Survivor = Registry_Create();
             REQUIRE(Registry_Set(g_Survivor, 789, 10));
             SendRconCommand("loadfs ownership");
@@ -102,6 +113,7 @@ public IntegrationStep(step)
             new text[80];
             format(text, sizeof text, "%d\n%d\n", cycle + 1, _:g_Survivor);
             fwrite(output_file, text); fclose(output_file);
+            REQUIRE(CallRemoteFunction("SurvivorVerify", "i", cycle) == 1);
             if (cycle < 2) SendRconCommand("gmx");
             else
             {

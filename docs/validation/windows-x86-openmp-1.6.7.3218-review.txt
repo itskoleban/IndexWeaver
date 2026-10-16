@@ -1,0 +1,94 @@
+Starting open.mp server (1.6.7.3218) from commit 3d20f3dc0e26917264cdc8585c65913e080a143c
+Loading component $CAPI.dll
+	Successfully loaded component C-API (1.6.7.3218) with UID 10467dd8d4c56fc6
+Loading component Actors.dll
+	Successfully loaded component Actors (1.6.7.3218) with UID c81ca021eae2ad5c
+Loading component Checkpoints.dll
+	Successfully loaded component Checkpoints (1.6.7.3218) with UID 44a937350d611dde
+Loading component Classes.dll
+	Successfully loaded component Classes (1.6.7.3218) with UID 8cfb3183976da208
+Loading component Console.dll
+	Successfully loaded component Console (1.6.7.3218) with UID bfa24e49d0c95ee4
+Loading component CustomModels.dll
+	Successfully loaded component CustomModels (1.6.7.3218) with UID 15e3cb1e7c77ffff
+Loading component Databases.dll
+	Successfully loaded component Databases (1.6.7.3218) with UID 80092e7eb5821a96
+Loading component Dialogs.dll
+	Successfully loaded component Dialogs (1.6.7.3218) with UID 44a111350d611dde
+Loading component GangZones.dll
+	Successfully loaded component GangZones (1.6.7.3218) with UID b3351d11ee8d8056
+Loading component IndexWeaver.dll
+	Successfully loaded component IndexWeaver (2.0.0.0) with UID 66a7b41ca0d8f3cf
+Loading component LegacyConfig.dll
+	Successfully loaded component LegacyConfig (1.6.7.3218) with UID 24ef6216838f9ffc
+Loading component LegacyNetwork.dll
+	Successfully loaded component RakNetLegacyNetwork (1.6.7.3218) with UID ea9799fd79cf8442
+Loading component Menus.dll
+	Successfully loaded component Menus (1.6.7.3218) with UID 621e219eb97ee0b2
+Loading component NPCs.dll
+	Successfully loaded component NPCs (1.6.7.3218) with UID 3d0e59e87f4e90bc
+Loading component Objects.dll
+	Successfully loaded component Objects (1.6.7.3218) with UID 59f8415f72da6160
+Loading component Pawn.dll
+	Successfully loaded component Pawn (1.6.7.3218) with UID 78906cd9f19c36a6
+Loading component Pickups.dll
+	Successfully loaded component Pickups (1.6.7.3218) with UID cf304faa363dd971
+Loading component Recordings.dll
+	Successfully loaded component Recordings (1.6.7.3218) with UID 871144d399f5f613
+Loading component TextDraws.dll
+	Successfully loaded component TextDraws (1.6.7.3218) with UID 9b5dc2b1d15c992a
+Loading component TextLabels.dll
+	Successfully loaded component TextLabels (1.6.7.3218) with UID a0c57ea80a009742
+Loading component Timers.dll
+	Successfully loaded component Timers (1.6.7.3218) with UID 2ad8124c5ea257a3
+Loading component Variables.dll
+	Successfully loaded component Variables (1.6.7.3218) with UID 75e121848bc01fa2
+Loading component Vehicles.dll
+	Successfully loaded component Vehicles (1.6.7.3218) with UID 3f1f62ee9e22ab19
+Loaded 23 component(s) from <isolated-server>/components
+[2026-10-15T21:18:28-0500] [Info] INDEXWEAVER_INTEGRATION_PASS
+[2026-10-15T21:18:28-0500] [Info] Legacy Network started on 127.0.0.1:17779.
+[2026-10-15T21:18:28-0500] [Info] INDEXWEAVER_SURVIVOR_READY_PASS
+[2026-10-15T21:18:28-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:28-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:28-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:28-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:28-0500] [Info] INDEXWEAVER_EXAMPLE_SAFETY_PASS
+[2026-10-15T21:18:28-0500] [Info] Filterscript 'example_safety' loaded.
+[2026-10-15T21:18:28-0500] [Info] Filterscript 'example_safety' unloaded.
+[2026-10-15T21:18:28-0500] [Info] INDEXWEAVER_FILTERSCRIPT_OWNERSHIP_PASS
+[2026-10-15T21:18:28-0500] [Info] Filterscript 'ownership' loaded.
+[2026-10-15T21:18:28-0500] [Info] Filterscript 'ownership' unloaded.
+[2026-10-15T21:18:28-0500] [Info] INDEXWEAVER_FILTERSCRIPT_UNLOAD_PASS
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_INTEGRATION_PASS
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_SURVIVOR_RESET_PASS
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_SURVIVOR_READY_PASS
+[2026-10-15T21:18:40-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:40-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:40-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:40-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_EXAMPLE_SAFETY_PASS
+[2026-10-15T21:18:40-0500] [Info] Filterscript 'example_safety' loaded.
+[2026-10-15T21:18:40-0500] [Info] Filterscript 'example_safety' unloaded.
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_FILTERSCRIPT_OWNERSHIP_PASS
+[2026-10-15T21:18:40-0500] [Info] Filterscript 'ownership' loaded.
+[2026-10-15T21:18:40-0500] [Info] Filterscript 'ownership' unloaded.
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_FILTERSCRIPT_UNLOAD_PASS
+[2026-10-15T21:18:40-0500] [Info] INDEXWEAVER_GMX_HANDLE_PASS
+[2026-10-15T21:18:52-0500] [Info] INDEXWEAVER_INTEGRATION_PASS
+[2026-10-15T21:18:52-0500] [Info] INDEXWEAVER_SURVIVOR_RESET_PASS
+[2026-10-15T21:18:52-0500] [Info] INDEXWEAVER_SURVIVOR_READY_PASS
+[2026-10-15T21:18:52-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:52-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:52-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:52-0500] [Info] Registry initialization failed: 1
+[2026-10-15T21:18:52-0500] [Info] INDEXWEAVER_EXAMPLE_SAFETY_PASS
+[2026-10-15T21:18:52-0500] [Info] Filterscript 'example_safety' loaded.
+[2026-10-15T21:18:52-0500] [Info] Filterscript 'example_safety' unloaded.
+[2026-10-15T21:18:52-0500] [Info] INDEXWEAVER_FILTERSCRIPT_OWNERSHIP_PASS
+[2026-10-15T21:18:52-0500] [Info] Filterscript 'ownership' loaded.
+[2026-10-15T21:18:52-0500] [Info] Filterscript 'ownership' unloaded.
+[2026-10-15T21:18:52-0500] [Info] INDEXWEAVER_FILTERSCRIPT_UNLOAD_PASS
+[2026-10-15T21:18:53-0500] [Info] INDEXWEAVER_GMX_HANDLE_PASS
+[2026-10-15T21:18:53-0500] [Info] INDEXWEAVER_LIFECYCLE_PASS
+[2026-10-15T21:18:53-0500] [Info] INDEXWEAVER_SURVIVOR_SHUTDOWN_PASS

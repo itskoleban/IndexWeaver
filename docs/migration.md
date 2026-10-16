@@ -18,7 +18,7 @@ The deprecated mapping natives remain for source migration through 2.x, but ther
 
 Both old and new forward-only mappings permit duplicate index values. Bidirectional mode deliberately rejects an occupied index. Set preserves idempotency; Insert rejects an existing ID even when the pair is identical. Use separate registries for independent slot spaces.
 
-Compatibility reserve retains 1.x's 10,000,000 upper bound and rejects zero. New handle reserve accepts zero and has no such arbitrary cap. Fixed 0..63 categories have no special performance or memory semantics. Empty categories may retain buckets until explicit clear-all/unload; nonempty ClearMapRegistry destroys its category. Previously the fast/slow category split produced different retention/clear behavior; do not rely on those internals.
+Compatibility reserve retains 1.x's 10,000,000 upper bound and rejects zero. New handle reserve accepts zero and has no such arbitrary cap. Fixed 0..63 categories have no special performance or memory semantics. Empty categories may retain buckets after removal or reservation; ClearMapRegistry destroys any existing category and releases that storage, even if it is empty. It returns false only for an absent or invalid category. In 1.x, clearing an empty fast category returned false, while clearing an existing empty slow category returned true. 2.0 deliberately makes release behavior consistent for all categories.
 
 The debug-level natives/constants have been removed. Read `Registry_GetLastError` after a failed call. Unexpected internal exceptions always log a diagnostic rather than depending on a global debug flag.
 

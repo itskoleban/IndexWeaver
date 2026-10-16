@@ -1,4 +1,5 @@
 #include "manager.hpp"
+#include "diagnostics.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <initializer_list>
@@ -161,6 +162,31 @@ void compatibility() {
         return !failed;
     });
 }
+void emptyLegacyCleanup() {
+    const auto baseline = live;
+    {
+        Manager m; int owner = 0, other = 0;
+        m.load(&owner); m.load(&other);
+        CHECK(m.legacy(&other, 77, true)->set(9, 2) == Error::None);
+        auto* reserved = m.legacy(&owner, 77, true);
+        reserved->reserve(10000);
+        CHECK(m.countLegacy(&owner) == 0);
+        const auto allocated = live;
+        remaining = 0;
+        CHECK(m.clearLegacy(&owner, 77));
+        CHECK(!m.clearLegacy(&owner, 77));
+        remaining = -1;
+        CHECK(live < allocated);
+        CHECK(!m.legacy(&owner, 77, false));
+        CHECK(m.legacy(&other, 77, false)->index(9) == 2);
+        CHECK(m.legacy(&owner, 77, true)->set(1, 3) == Error::None);
+        CHECK(m.legacy(&owner, 77, false)->remove(1));
+        remaining = 0;
+        CHECK(m.clearLegacy(&owner, 77));
+        m.shutdown(); remaining = -1;
+    }
+    CHECK(live == baseline);
+}
 #ifdef IW_TEST_NATIVE_ALLOCATION
 namespace {
 const AMX_NATIVE_INFO* table = nullptr;
@@ -183,7 +209,7 @@ int AMXAPI amx_GetAddr(AMX* amx, cell address, cell** result) {
     *result = reinterpret_cast<cell*>(amx->data + address); return AMX_ERR_NONE;
 }
 void nativeFailures() {
-    for (int operation = 0; operation < 5; ++operation) sweep([=](int budget) {
+    for (int operation = 0; operation < 6; ++operation) sweep([=](int budget) {
         Manager m; AMX amx{};
         m.load(&amx); bindNatives(&m); CHECK(registerNatives(&amx) == AMX_ERR_NONE);
         const auto h = m.create(&amx, true, 0);
@@ -194,7 +220,8 @@ void nativeFailures() {
                 case 1: return call(amx, "Registry_Set", {h, 3, 4});
                 case 2: return call(amx, "Registry_Set", {h, 1, 4});
                 case 3: return call(amx, "SetMapIndex", {77, 3, 4});
-                default: return call(amx, "Registry_Clear", {h, 1});
+                case 4: return call(amx, "Registry_Clear", {h, 1});
+                default: return call(amx, "Registry_Reserve", {h, 1000});
             }
         };
         remaining = budget;
@@ -216,6 +243,7 @@ void nativeFailures() {
         if (operation == 2) CHECK(r->index(1) == 4 && r->id(4) == 1 && !r->id(2));
         if (operation == 3) CHECK(m.legacy(&amx, 77, false)->index(3) == 4);
         if (operation == 4) CHECK(r->size() == 0);
+        if (operation == 5) CHECK(r->index(1) == 2 && r->id(2) == 1 && r->size() == 1);
         remaining = 0; m.shutdown(); bindNatives(nullptr); remaining = -1;
         return !failed;
     });
@@ -223,10 +251,11 @@ void nativeFailures() {
 }
 #endif
 int main() {
+    configureTestDiagnostics();
     loading(false); loading(true);
     creation(false, 0); creation(true, 0);
     creation(false, 100); creation(true, 100);
-    compatibility();
+    compatibility(); emptyLegacyCleanup();
 #ifdef IW_TEST_NATIVE_ALLOCATION
     nativeFailures();
 #endif
